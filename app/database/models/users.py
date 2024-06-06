@@ -1,28 +1,91 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, BIGINT
-from sqlalchemy import Column, Integer, String, DateTime
-import sqlalchemy
-from datetime import datetime
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy.orm import sessionmaker, relationship, declarative_base
 from datetime import datetime
 
 
 engine = create_engine('sqlite:///app/database/women_bot.db', echo=True)
 SessionLocal = sessionmaker(bind=engine)
-Base = sqlalchemy.orm.declarative_base()
+Base = declarative_base()
 
 
 class User(Base):
     __tablename__ = 'users'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, unique=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)  # Primary key
+    user_id = Column(Integer, unique=True)  # Assuming user_id is unique
+    gender = Column(String)
+    city = Column(String)
+    subscription_type = Column(String)
+    subscription_status = Column(String)
+    subscription_end_date = Column(Date)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    subscriptions = relationship('Subscription', order_by='Subscription.subscription_id', back_populates='user')
+    profiles = relationship('Profile', order_by='Profile.profile_id', back_populates='user')
+    reviews = relationship('Review', order_by='Review.review_id', back_populates='user')
+
+class Subscription(Base):
+    __tablename__ = 'subscriptions'
+
+    subscription_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    type = Column(String, nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date)
+    status = Column(String, nullable=False)
+
+    user = relationship('User', back_populates='subscriptions')
 
 
-class Admins(Base):
-    __tablename__ = 'admins'
+class City(Base):
+    __tablename__ = 'cities'
 
-    id = Column(Integer, primary_key=True)
-    user_id = Column(BIGINT)
+    city_id = Column(Integer, primary_key=True, autoincrement=True)
+    city_name = Column(String, unique=True, nullable=False)
+
+
+class Profile(Base):
+    __tablename__ = 'profiles'
+
+    profile_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    name = Column(String, nullable=False)
+    age = Column(Integer, nullable=False)
+    weight = Column(Integer, nullable=False)
+    height = Column(Integer, nullable=False)
+    breast_size = Column(String, nullable=False)
+    hourly_rate = Column(Integer, nullable=False)
+    apartments = Column(Boolean, nullable=False)
+    outcall = Column(Boolean, nullable=False)
+    photos = Column(Text)
+    city_id = Column(Integer, ForeignKey('cities.city_id'), nullable=False)
+
+    user = relationship('User', back_populates='profiles')
+    city = relationship('City')
+
+
+class Review(Base):
+    __tablename__ = 'reviews'
+
+    review_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    phone_number = Column(String, nullable=False)
+    review_text = Column(Text, nullable=False)
+    review_type = Column(String, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
+
+    user = relationship('User', back_populates='reviews')
+
+
+class AdminAction(Base):
+    __tablename__ = 'admin_actions'
+
+    action_id = Column(Integer, primary_key=True, autoincrement=True)
+    admin_id = Column(Integer, nullable=False)
+    action_type = Column(String, nullable=False)
+    action_details = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now)
 
 
 Base.metadata.create_all(engine)
