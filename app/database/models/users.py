@@ -50,19 +50,19 @@ class Profile(Base):
 
     profile_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
-    name = Column(String, nullable=False)
-    age = Column(Integer, nullable=False)
-    weight = Column(Integer, nullable=False)
-    height = Column(Integer, nullable=False)
-    breast_size = Column(String, nullable=False)
-    hourly_rate = Column(Integer, nullable=False)
-    apartments = Column(Boolean, nullable=False)
-    outcall = Column(Boolean, nullable=False)
+    name = Column(String)
+    age = Column(Integer)
+    weight = Column(Integer)
+    height = Column(Integer)
+    breast_size = Column(String)
+    hourly_rate = Column(Integer)
+    apartments = Column(Boolean)
+    outcall = Column(Boolean)
     photos = Column(Text)
-    city_id = Column(Integer, ForeignKey('cities.city_id'), nullable=False)
+    city = Column(String)
 
-    user = relationship('User', back_populates='profiles')
-    city = relationship('City')
+    user = relationship("User", back_populates="profiles")
+
 
 
 class Review(Base):

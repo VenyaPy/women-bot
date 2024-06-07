@@ -26,3 +26,54 @@ city_choose = [
     [InlineKeyboardButton(text="Волгоград", callback_data="city_volgograd")],
     [InlineKeyboardButton(text="Пермь", callback_data="city_perm")]
 ]
+
+
+women_subscribe = [
+    [
+        InlineKeyboardButton(text="Проверка: 999р в мес", callback_data="check999")
+    ],
+    [
+        InlineKeyboardButton(text="Анкета: 1500р в мес", callback_data="questionnaire1500")
+    ],
+    [
+        InlineKeyboardButton(text="Акция! Проверка + Анкета: 999р", callback_data="check_and_questionnaire")
+    ]
+]
+
+politic_buttons = [
+    [
+        InlineKeyboardButton(text="Оферта", callback_data='oferta')
+    ],
+    [
+        InlineKeyboardButton(text="Политика конфиденциальности", callback_data="politics")
+    ]
+]
+
+positive_or_negative = [
+    [
+        InlineKeyboardButton(text="Положительный", callback_data="review_positive")
+    ],
+    [
+        InlineKeyboardButton(text="Отрицательный", callback_data="review_negative")
+    ]
+]
+
+
+add_or_not_add_review = [
+    [
+        InlineKeyboardButton(text="Добавить отзыв", callback_data="want_to_add_review")
+    ],
+    [
+        InlineKeyboardButton(text="Не хочу добавлять", callback_data="dont_want_to_add")
+    ]
+]
+
+
+send_or_delete_review = [
+    [
+        InlineKeyboardButton(text="Отправить", callback_data="send_review_to_bd")
+    ],
+    [
+        InlineKeyboardButton(text="Отменить", callback_data="cancel_review")
+    ]
+]
