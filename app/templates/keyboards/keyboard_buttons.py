@@ -6,6 +6,9 @@ prev_next_button = [
         KeyboardButton(text=">>>")
     ],
     [
+        KeyboardButton(text="Обновить список анкет")
+    ],
+    [
         KeyboardButton(text="Помощь")
     ]
 ]

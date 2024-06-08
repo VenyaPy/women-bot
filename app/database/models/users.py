@@ -60,8 +60,11 @@ class Profile(Base):
     outcall = Column(Boolean)
     photos = Column(Text)
     city = Column(String)
+    phone_number = Column(String)
 
     user = relationship("User", back_populates="profiles")
+
+
 
 
 

@@ -7,6 +7,7 @@ from app.handlers.user.start import start_router
 from app.handlers.user.women_help import women_router
 from app.handlers.user.women_review import women_review_router
 from app.handlers.user.women_check_number import women_check_router
+from app.handlers.user.women_profile import women_profile_router
 
 
 TOKEN = TOKEN_BOT
@@ -17,7 +18,8 @@ dp = Dispatcher()
 dp.include_routers(start_router,
                    women_router,
                    women_review_router,
-                   women_check_router)
+                   women_check_router,
+                   women_profile_router)
 
 
 async def main() -> None:

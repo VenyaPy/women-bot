@@ -63,6 +63,7 @@ async def add_review(message: Message, state: FSMContext):
             info = get_user_info(db=db, user_id=user_id)
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
+        print("Subscription status:", info.subscription_status)
 
         if not info.subscription_status:
             await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
@@ -167,11 +168,3 @@ async def cancel_last_review(callback_query: CallbackQuery, state: FSMContext):
         print(f"Error in cancel_last_review: {e}")
 
 
-# Обработка всех непредвиденных ошибок
-@women_review_router.errors()
-async def global_error_handler(update, exception):
-    if isinstance(update, Message):
-        await update.answer("Произошла ошибка. Пожалуйста, попробуйте еще раз.")
-    elif isinstance(update, CallbackQuery):
-        await update.message.answer("Произошла ошибка. Пожалуйста, попробуйте еще раз.")
-    print(f"Unhandled error: {exception}")

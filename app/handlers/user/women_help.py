@@ -27,18 +27,3 @@ async def choose_women_subscribe(message: Message):
     await message.answer(text="Возник вопрос? Напишите: @esc222")
 
 
-@women_router.message(F.text == "Добавить анкету")
-async def add_questionnaire(message: Message):
-    user_id = message.from_user.id
-    with SessionManager() as db:
-        info = get_user_info(db=db, user_id=user_id)
-
-    sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
-
-    if not info.subscription_type:
-        await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
-                             reply_markup=sub_inline)
-    else:
-        await message.answer(text="У вас уже есть подписка. Продолжайте добавлять анкету.")
-
-

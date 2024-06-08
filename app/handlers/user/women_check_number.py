@@ -128,10 +128,4 @@ async def process_phone_number(message: Message, state: FSMContext):
         print(f"Error in process_phone_number: {e}")
 
 
-@women_check_router.errors()
-async def global_error_handler(update, exception):
-    if isinstance(update, Message):
-        await update.answer("Произошла ошибка. Пожалуйста, попробуйте еще раз.")
-    elif isinstance(update, CallbackQuery):
-        await update.message.answer("Произошла ошибка. Пожалуйста, попробуйте еще раз.")
-    print(f"Unhandled error: {exception}")
+

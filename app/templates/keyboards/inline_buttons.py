@@ -77,3 +77,18 @@ send_or_delete_review = [
         InlineKeyboardButton(text="Отменить", callback_data="cancel_review")
     ]
 ]
+
+
+other_city = [
+    [
+        InlineKeyboardButton(text="Изменит город", callback_data="other_city_callback")
+    ]
+]
+
+
+enough_photo_women = [
+    [
+        InlineKeyboardButton(text="Добавить анкету", callback_data="enough_photos"),
+        InlineKeyboardButton(text="Отменить", callback_data="cancel_send_profile")
+    ]
+]

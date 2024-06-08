@@ -35,6 +35,45 @@ def update_user_city(db: Session, user_id, city):
         print(f"User {user_id} обновлен с городом {city}!")
 
 
+def create_profile(db: Session,
+                   user_id: int,
+                   name: str,
+                   age: int,
+                   weight: int,
+                   height: int,
+                   breast_size: str,
+                   hourly_rate: int,
+                   phone_number: str,
+                   apartments: bool,
+                   outcall: bool,
+                   photos: str,
+                   city: str):
+    new_profile = Profile(
+        user_id=user_id,
+        name=name,
+        age=age,
+        weight=weight,
+        height=height,
+        breast_size=breast_size,
+        hourly_rate=hourly_rate,
+        phone_number=phone_number,
+        apartments=apartments,
+        outcall=outcall,
+        photos=photos,
+        city=city
+    )
+    db.add(new_profile)
+    db.commit()
+    return new_profile
+
+
+def get_user_city(db: Session, user_id: int) -> str:
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user:
+        return user.city
+
+
+
 def get_all_profiles(db: Session, city: str):
     profiles = db.query(Profile).filter(Profile.city == city).all()
     if not profiles:
