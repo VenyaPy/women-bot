@@ -1,7 +1,7 @@
 from aiogram.filters import Filter
 from aiogram import Bot, types
 from app.database.models.users import SessionLocal
-from app.database.requests.crud import show_admins
+from config import ADMINS
 
 
 class SessionManager:
@@ -18,11 +18,9 @@ class SessionManager:
 
 class IsAdmin(Filter):
     async def __call__(self, message: types.Message, bot: Bot):
-        with SessionManager() as db:
-            try:
-                admins = show_admins(db=db)
-                is_admin = message.from_user.id in admins
-            except Exception as e:
-                print(f"Ошибка при доступе к базе данных: {e}")
-                is_admin = False
-            return is_admin
+        try:
+            is_admin = message.from_user.id in ADMINS
+        except Exception as e:
+            print(f"Ошибка при доступе к базе данных: {e}")
+            is_admin = False
+        return is_admin

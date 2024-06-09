@@ -81,7 +81,14 @@ send_or_delete_review = [
 
 other_city = [
     [
-        InlineKeyboardButton(text="Изменит город", callback_data="other_city_callback")
+        InlineKeyboardButton(text="Обновить", callback_data="update_profile_list"),
+        InlineKeyboardButton(text="Изменить город", callback_data="other_city_callback")
+    ]
+]
+
+girl_profile_choose = [
+    [
+        InlineKeyboardButton(text="Удалить анкету", callback_data="del_my_profile")
     ]
 ]
 
@@ -91,4 +98,35 @@ enough_photo_women = [
         InlineKeyboardButton(text="Добавить анкету", callback_data="enough_photos"),
         InlineKeyboardButton(text="Отменить", callback_data="cancel_send_profile")
     ]
+]
+
+
+is_check_post = [
+    [
+        InlineKeyboardButton(text="Посмотреть результат", callback_data="check_mailing_result")
+    ]
+]
+
+
+send_or_delete_mail = [
+    [
+        InlineKeyboardButton(text="Отправить пост", callback_data="send_mail"),
+        InlineKeyboardButton(text="Удалить пост", callback_data="delete_mail")
+    ]
+]
+
+
+users_of_mailing = [
+    [
+        InlineKeyboardButton(text="Всем", callback_data="send_to_all")
+    ],
+    [
+        InlineKeyboardButton(text="Мужчинам", callback_data="send_mail_to_mens")
+    ],
+    [
+        InlineKeyboardButton(text="Женщинам", callback_data="send_mail_to_women")
+    ],
+    [
+        InlineKeyboardButton(text="Оформленным подпискам", callback_data="send_mail_to_subscribers")
+    ],
 ]

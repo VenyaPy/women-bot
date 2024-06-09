@@ -1,6 +1,10 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
+
+from app.handlers.admin.admin_mailing import admin_mailing_router
+from app.handlers.admin.admin_start import admin_router
+from app.handlers.user.men_menu import men_router
 from config import TOKEN_BOT
 from aiogram.client.default import DefaultBotProperties
 from app.handlers.user.start import start_router
@@ -19,7 +23,10 @@ dp.include_routers(start_router,
                    women_router,
                    women_review_router,
                    women_check_router,
-                   women_profile_router)
+                   women_profile_router,
+                   men_router,
+                   admin_router,
+                   admin_mailing_router)
 
 
 async def main() -> None:

@@ -2,6 +2,26 @@ from sqlalchemy.orm import Session
 from app.database.models.users import User, Profile, Review
 
 
+def get_all_user_ids(db: Session) -> list:
+    user_ids = db.query(User.user_id).all()
+    return [user_id[0] for user_id in user_ids]
+
+
+def get_male_users(db: Session) -> list:
+    male_users = db.query(User).filter(User.gender == "Мужчина").all()
+    return male_users
+
+
+def get_female_users(db: Session) -> list:
+    female_users = db.query(User).filter(User.gender == "Женщина").all()
+    return female_users
+
+
+def get_users_with_active_subscription(db: Session) -> list:
+    active_users = db.query(User).filter(User.subscription_status == "True").all()
+    return active_users
+
+
 def add_or_update_user(db: Session, user_id, gender):
     user = db.query(User).filter(User.user_id == user_id).first()
 
@@ -25,6 +45,23 @@ def get_user_info(db: Session, user_id: int):
     else:
         print('Не смогли найти информацию о юзере')
         return None
+
+
+def is_profile_info(db: Session, user_id: int):
+    is_profile = db.query(Profile).filter(Profile.user_id == user_id).first()
+
+    if not is_profile:
+        return None
+
+    return is_profile
+
+
+def delete_profile(db: Session, user_id: int):
+    user = db.query(Profile).filter(Profile.user_id == user_id).first()
+    db.delete(user)
+    db.commit()
+
+    print(f"{user} удален")
 
 
 def update_user_city(db: Session, user_id, city):

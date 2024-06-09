@@ -24,6 +24,7 @@ class SessionManager:
 
 @women_router.message(F.text == "Помощь")
 async def choose_women_subscribe(message: Message):
-    await message.answer(text="Возник вопрос? Напишите: @esc222")
+    await message.answer(text="Возник вопрос?\n\nНапишите: @esc222")
+
 
 

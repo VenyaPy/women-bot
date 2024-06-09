@@ -6,9 +6,6 @@ prev_next_button = [
         KeyboardButton(text=">>>")
     ],
     [
-        KeyboardButton(text="Обновить список анкет")
-    ],
-    [
         KeyboardButton(text="Помощь")
     ]
 ]
@@ -24,6 +21,16 @@ reviews_button = [
     ],
     [
         KeyboardButton(text="Помощь")
+    ]
+]
+
+
+admin_menu_keyboard = [
+    [
+        KeyboardButton(text="Рассылка")
+    ],
+    [
+        KeyboardButton(text="Отключить подписку")
     ]
 ]
 
