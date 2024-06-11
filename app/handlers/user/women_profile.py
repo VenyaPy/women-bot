@@ -64,9 +64,8 @@ async def add_women_profile(message: Message, state: FSMContext):
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
-        if info.subscription_status.lower() != "true":
-            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
-                                 reply_markup=sub_inline)
+        if info.subscription_type not in ["Анкета", "Проверка + Анкета"]:
+            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:", reply_markup=sub_inline)
             return
 
         if is_profile:
@@ -77,35 +76,14 @@ async def add_women_profile(message: Message, state: FSMContext):
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg" for
-                            i in range(1, 4) if
-                            os.path.exists(
-                                f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")]
             if photos_paths:
-                media = [InputMediaPhoto(media=FSInputFile(path=photo_path),
-
-                                         caption=f"<b>Имя:</b> {is_profile.name}\n<b>Возраст:</b> {is_profile.age}\n"
-                                                 f"<b>Вес:</b> {is_profile.weight}\n<b>Рост:</b> {is_profile.height}\n"
-                                                 f"<b>Размер груди:</b> {is_profile.breast_size}\n"
-                                                 f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n"
-                                                 f"{service_text if service_text else 'Услуги не указаны'}\n\n"
-                                                 f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>")
-                         for photo_path in photos_paths]
+                media = [InputMediaPhoto(media=FSInputFile(path=photo_path), caption=f"<b>Имя:</b> {is_profile.name}\n<b>Возраст:</b> {is_profile.age}\n<b>Вес:</b> {is_profile.weight}\n<b>Рост:</b> {is_profile.height}\n<b>Размер груди:</b> {is_profile.breast_size}\n<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n{service_text if service_text else 'Услуги не указаны'}\n\n<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>") for photo_path in photos_paths]
                 await message.answer_media_group(media)
                 await message.answer(text="Действия с анкетой:", reply_markup=inline_girl_del)
             else:
-                await message.answer(
-                    text=f"<b>Имя:</b> {is_profile.name}\n"
-                         f"<b>Возраст:</b> {is_profile.age}\n"
-                         f"<b>Вес:</b> {is_profile.weight}\n"
-                         f"<b>Рост:</b> {is_profile.height}\n"
-                         f"<b>Размер груди:</b> {is_profile.breast_size}\n"
-                         f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб"
-                         f"\n\n{service_text if service_text else 'Услуги не указаны'}"
-                         f"\n\n<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>",
-                    reply_markup=inline_girl_del
-                )
-        if not is_profile and info.subscription_status.lower() == "true":
+                await message.answer(text=f"<b>Имя:</b> {is_profile.name}\n<b>Возраст:</b> {is_profile.age}\n<b>Вес:</b> {is_profile.weight}\n<b>Рост:</b> {is_profile.height}\n<b>Размер груди:</b> {is_profile.breast_size}\n<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n{service_text if service_text else 'Услуги не указаны'}\n\n<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>", reply_markup=inline_girl_del)
+        else:
             await state.set_state(WomenProfile.name)
             await message.answer("Введите ваше имя, например: Ирина")
     except Exception as e:

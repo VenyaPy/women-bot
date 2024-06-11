@@ -1,3 +1,7 @@
+import random
+import string
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 from app.database.models.users import User, Profile, Review
 
@@ -22,18 +26,45 @@ def get_users_with_active_subscription(db: Session) -> list:
     return active_users
 
 
-def add_or_update_user(db: Session, user_id, gender):
-    user = db.query(User).filter(User.user_id == user_id).first()
+def generate_customer_key():
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=16))
 
+
+def add_or_update_user(user_id: int, gender: str, db: Session):
+    user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         user.gender = gender
-        print(f"User {user_id} обновлен!")
+        user.updated_at = datetime.now()
     else:
-        new_user = User(user_id=user_id, gender=gender)
-        db.add(new_user)
-        print(f"User {user_id} добавлен!")
-
+        user = User(
+            user_id=user_id,
+            gender=gender,
+            customer_key=generate_customer_key()
+        )
+        db.add(user)
     db.commit()
+    return user
+
+
+def update_user_subscription(db: Session,
+                             user_id: int,
+                             subscription_status: str,
+                             subscription_type: str,
+                             subscription_end_date,
+                             rebill_id: str):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user:
+        user.subscription_status = subscription_status
+        user.subscription_type = subscription_type
+        user.subscription_end_date = subscription_end_date
+        user.rebill_id = rebill_id
+        user.updated_at = datetime.now()
+        db.commit()
+        return user
+    else:
+        print(f'User with ID {user_id} not found.')
+        return None
+
 
 
 def get_user_info(db: Session, user_id: int):

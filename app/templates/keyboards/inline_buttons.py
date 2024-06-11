@@ -40,6 +40,12 @@ women_subscribe = [
     ]
 ]
 
+subscribe = [
+    [
+        InlineKeyboardButton(text="Проверка: 999р в мес", url="")
+    ]
+]
+
 politic_buttons = [
     [
         InlineKeyboardButton(text="Оферта", callback_data='oferta')

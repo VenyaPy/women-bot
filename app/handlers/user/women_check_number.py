@@ -79,13 +79,14 @@ async def check_number(message: Message, state: FSMContext):
 
     sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
-    if not info.subscription_status:
+    if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
         await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
                              reply_markup=sub_inline)
         return
 
     await state.set_state(CheckPhoneNumber.waiting_for_number)
     await message.answer(text="Введите номер телефона в формате: 8 *** *** ** **")
+
 
 
 @women_check_router.message(CheckPhoneNumber.waiting_for_number)

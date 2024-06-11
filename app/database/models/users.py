@@ -15,15 +15,18 @@ class User(Base):
     user_id = Column(Integer, unique=True)  # Assuming user_id is unique
     gender = Column(String)
     city = Column(String)
-    subscription_type = Column(String)
-    subscription_status = Column(String)
+    subscription_type = Column(String, default="None")
+    subscription_status = Column(String, default="False")
     subscription_end_date = Column(Date)
+    customer_key = Column(String, unique=True)  # Уникальный идентификатор клиента
+    rebill_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     subscriptions = relationship('Subscription', order_by='Subscription.subscription_id', back_populates='user')
     profiles = relationship('Profile', order_by='Profile.profile_id', back_populates='user')
     reviews = relationship('Review', order_by='Review.review_id', back_populates='user')
+
 
 class Subscription(Base):
     __tablename__ = 'subscriptions'

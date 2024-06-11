@@ -5,6 +5,7 @@ from aiogram.enums import ParseMode
 from app.handlers.admin.admin_mailing import admin_mailing_router
 from app.handlers.admin.admin_start import admin_router
 from app.handlers.user.men_menu import men_router
+from app.handlers.user.tinkoff_user_pay import tinkoff_router
 from config import TOKEN_BOT
 from aiogram.client.default import DefaultBotProperties
 from app.handlers.user.start import start_router
@@ -26,7 +27,8 @@ dp.include_routers(start_router,
                    women_profile_router,
                    men_router,
                    admin_router,
-                   admin_mailing_router)
+                   admin_mailing_router,
+                   tinkoff_router)
 
 
 async def main() -> None:

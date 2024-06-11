@@ -1,23 +1,17 @@
 import os
 import random
-
 from aiogram import Router, F, types
 from aiogram.filters import CommandStart
-from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardMarkup, InputMediaPhoto, InputFile, \
-    FSInputFile
-
+from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardMarkup, InputMediaPhoto, FSInputFile
 from app.database.models.users import SessionLocal, User
-from app.database.requests.crud import add_or_update_user, update_user_city, get_all_profiles, get_user_info, \
-    get_user_city
+from app.database.requests.crud import add_or_update_user, update_user_city, get_all_profiles, get_user_info, get_user_city
 from app.handlers.admin.admin_start import admin_start_menu
 from app.templates.keyboards.keyboard_buttons import prev_next_button, reviews_button
-from app.templates.keyboards.inline_buttons import gender_start, city_choose, women_subscribe, politic_buttons, \
-    other_city
+from app.templates.keyboards.inline_buttons import gender_start, city_choose, women_subscribe, politic_buttons, other_city
 from app.templates.texts.user import message_command_start
 from config import ADMINS
 
 start_router = Router()
-
 
 class SessionManager:
     def __init__(self):
@@ -30,15 +24,15 @@ class SessionManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.db.close()
 
-
 @start_router.message(CommandStart())
 async def start(message: Message):
     inline_politics = InlineKeyboardMarkup(inline_keyboard=politic_buttons)
 
     user_id = message.from_user.id
 
-    if user_id not in ADMINS:
-
+    if user_id in ADMINS:
+        await admin_start_menu(message)
+    else:
         with SessionManager() as db:
             is_user = get_user_info(db=db, user_id=message.from_user.id)
             city = get_user_city(db=db, user_id=user_id)
@@ -63,10 +57,7 @@ async def start(message: Message):
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for
-                            i in range(1, 4) if
-                            os.path.exists(
-                                f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
             if photos_paths:
                 media = [InputMediaPhoto(media=FSInputFile(path=photo_path),
                                          caption=f"<b>Имя:</b> {random_profile.name}\n<b>Возраст:</b> {random_profile.age}\n"
@@ -83,23 +74,23 @@ async def start(message: Message):
                          f"<b>Возраст:</b> {random_profile.age}\n"
                          f"<b>Вес:</b> {random_profile.weight}\n"
                          f"<b>Рост:</b> {random_profile.height}\n"
-                         f"<b>Размер груди:</b> {random_profile.breast_size}\n"
-                         f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб"
+                         f"<b>Размер груди:</б> {random_profile.breast_size}\n"
+                         f"<b>Стоимость за час:</б> {random_profile.hourly_rate} руб"
                          f"\n\n{service_text if service_text else 'Услуги не указаны'}"
-                         f"\n\n<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
+                         f"\n\n<b>Номер телефона:</б> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
                     reply_markup=keyboard
                 )
 
         if is_user and is_user.gender == "Женщина":
-            await message.answer(text=message_command_start, reply_markup=inline_politics)
+            women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
+
+            await message.answer(text=message_command_start, reply_markup=women_review)
 
         if not is_user:
             await message.answer(text=message_command_start, reply_markup=inline_politics)
 
             inline_gender = InlineKeyboardMarkup(inline_keyboard=gender_start)
             await message.answer(text="Выберите ваш пол:", reply_markup=inline_gender)
-
-    await admin_start_menu(message)
 
 
 @start_router.callback_query(F.data.in_({"man_gender", "woman_gender"}))
@@ -157,12 +148,13 @@ async def process_city_selection(callback_query: CallbackQuery):
             service_info.append("Работаю на выезд")
         service_text = " и ".join(service_info).capitalize()
 
-        photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if
-                        os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+        photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
         if photos_paths:
             media = [InputMediaPhoto(media=FSInputFile(path=photo_path),
-                                     caption=f"<b>Имя:</b> {random_profile.name}\n<b>Возраст:</b> {random_profile.age}\n"
-                                             f"<b>Вес:</b> {random_profile.weight}\n<b>Рост:</b> {random_profile.height}\n"
+                                     caption=f"<b>Имя:</b> {random_profile.name}\n"
+                                             f"<b>Возраст:</b> {random_profile.age}\n"
+                                             f"<b>Вес:</b> {random_profile.weight}\n"
+                                             f"<b>Рост:</b> {random_profile.height}\n"
                                              f"<b>Размер груди:</b> {random_profile.breast_size}\n"
                                              f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб\n\n"
                                              f"{service_text if service_text else 'Услуги не указаны'}\n\n"
@@ -173,15 +165,11 @@ async def process_city_selection(callback_query: CallbackQuery):
             await callback_query.message.answer(
                 text=f"<b>Имя:</b> {random_profile.name}\n"
                      f"<b>Возраст:</b> {random_profile.age}\n"
-                     f"<b>Вес:</б> {random_profile.weight}\n"
-                     f"<b>Рост:</б> {random_profile.height}\n"
-                     f"<b>Размер груди:</б> {random_profile.breast_size}\n"
-                     f"<b>Стоимость за час:</б> {random_profile.hourly_rate} руб"
-                     f"\n\n{service_text if service_text else 'Услуги не указаны'}"
-                     f"\n\n<b>Номер телефона:</б> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
+                     f"<b>Вес:</b> {random_profile.weight}\n"
+                     f"<b>Рост:</b> {random_profile.height}\n"
+                     f"<b>Размер груди:</b> {random_profile.breast_size}\n"
+                     f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб\n\n"
+                     f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                     f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
                 reply_markup=keyboard
             )
-
-
-
-

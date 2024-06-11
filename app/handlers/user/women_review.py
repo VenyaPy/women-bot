@@ -41,15 +41,14 @@ async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
-        if not info.subscription_status:
+        if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
             await callback_query.message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
                                                 reply_markup=sub_inline)
             return
 
-        if info.subscription_status == "True":
-            await state.set_state(Review.type)
-            pos_or_neg = InlineKeyboardMarkup(inline_keyboard=positive_or_negative)
-            await callback_query.message.answer(text="Какой отзыв вы хотите добавить?", reply_markup=pos_or_neg)
+        await state.set_state(Review.type)
+        pos_or_neg = InlineKeyboardMarkup(inline_keyboard=positive_or_negative)
+        await callback_query.message.answer(text="Какой отзыв вы хотите добавить?", reply_markup=pos_or_neg)
     except Exception as e:
         await callback_query.message.answer("Произошла ошибка при добавлении отзыва. Попробуйте еще раз.")
         print(f"Error in add_review: {e}")
@@ -65,18 +64,18 @@ async def add_review(message: Message, state: FSMContext):
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
         print("Subscription status:", info.subscription_status)
 
-        if not info.subscription_status:
+        if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
             await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
                                  reply_markup=sub_inline)
             return
 
-        if info.subscription_status == "True":
-            await state.set_state(Review.type)
-            pos_or_neg = InlineKeyboardMarkup(inline_keyboard=positive_or_negative)
-            await message.answer(text="Какой отзыв вы хотите добавить?", reply_markup=pos_or_neg)
+        await state.set_state(Review.type)
+        pos_or_neg = InlineKeyboardMarkup(inline_keyboard=positive_or_negative)
+        await message.answer(text="Какой отзыв вы хотите добавить?", reply_markup=pos_or_neg)
     except Exception as e:
         await message.answer("Произошла ошибка при добавлении отзыва. Попробуйте еще раз.")
         print(f"Error in add_review: {e}")
+
 
 
 @women_review_router.callback_query(F.data == "review_positive")
