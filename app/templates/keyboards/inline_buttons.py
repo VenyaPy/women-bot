@@ -30,13 +30,21 @@ city_choose = [
 
 women_subscribe = [
     [
-        InlineKeyboardButton(text="Проверка: 999р в мес", callback_data="check999")
+        InlineKeyboardButton(text="Проверка: 999р/мес", callback_data="check999")
     ],
     [
-        InlineKeyboardButton(text="Анкета: 1500р в мес", callback_data="questionnaire1500")
+        InlineKeyboardButton(text="Анкета: 1500р/мес", callback_data="questionnaire1500")
     ],
     [
-        InlineKeyboardButton(text="Акция! Проверка + Анкета: 999р", callback_data="check_and_questionnaire")
+        InlineKeyboardButton(text="Акция! Проверка + Анкета: 999р/мес", callback_data="check_and_questionnaire")
+    ]
+]
+
+is_cancel_sub = [
+    [
+        InlineKeyboardButton(text="Да", callback_data="yes_cancel_button"),
+        InlineKeyboardButton(text="Нет", callback_data="no_cancel_button"),
+
     ]
 ]
 
@@ -48,10 +56,16 @@ subscribe = [
 
 politic_buttons = [
     [
-        InlineKeyboardButton(text="Оферта", callback_data='oferta')
+        InlineKeyboardButton(text="Оферта",
+                             url="https://telegra.ph/Oferta-06-12-2")
     ],
     [
-        InlineKeyboardButton(text="Политика конфиденциальности", callback_data="politics")
+        InlineKeyboardButton(text="Оферта рекуррентных платежей",
+                             url="https://telegra.ph/Oferta-rekurentnyh-platezhej-06-12")
+    ],
+    [
+        InlineKeyboardButton(text="Политика конфиденциальности",
+                             url="https://telegra.ph/Politika-konfidencialnosti-06-12-11")
     ]
 ]
 

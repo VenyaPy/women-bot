@@ -125,7 +125,10 @@ async def process_city_selection(callback_query: CallbackQuery):
         women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
 
         await callback_query.message.answer(text=f"Привет, {name}", reply_markup=women_review)
-        await callback_query.message.answer(text="Выберите тип подписки:", reply_markup=women_inline)
+        await callback_query.message.answer(
+            text="Выберите тип подписки (автоматически продлевается каждый месяц):",
+            reply_markup=women_inline
+        )
 
     elif gender == 'Мужчина':
         await callback_query.message.delete()

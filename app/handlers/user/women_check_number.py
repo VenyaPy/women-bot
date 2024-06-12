@@ -80,7 +80,7 @@ async def check_number(message: Message, state: FSMContext):
     sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
     if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
-        await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
+        await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):",
                              reply_markup=sub_inline)
         return
 

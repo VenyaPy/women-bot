@@ -65,7 +65,7 @@ async def add_women_profile(message: Message, state: FSMContext):
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
         if info.subscription_type not in ["Анкета", "Проверка + Анкета"]:
-            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:", reply_markup=sub_inline)
+            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):", reply_markup=sub_inline)
             return
 
         if is_profile:

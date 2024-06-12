@@ -21,6 +21,25 @@ reviews_button = [
     ],
     [
         KeyboardButton(text="Помощь")
+    ],
+    [
+        KeyboardButton(text="Отменить подписку")
+    ]
+]
+
+reviews_button_cancel = [
+    [
+        KeyboardButton(text="Добавить отзыв")
+    ],
+    [
+        KeyboardButton(text="Проверить номер"),
+        KeyboardButton(text="Добавить анкету")
+    ],
+    [
+        KeyboardButton(text="Помощь")
+    ],
+    [
+        KeyboardButton(text="Отменить подписку")
     ]
 ]
 

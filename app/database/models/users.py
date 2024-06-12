@@ -17,9 +17,10 @@ class User(Base):
     city = Column(String)
     subscription_type = Column(String, default="None")
     subscription_status = Column(String, default="False")
-    subscription_end_date = Column(Date)
+    subscription_end_date = Column(DateTime)
     customer_key = Column(String, unique=True)  # Уникальный идентификатор клиента
     rebill_id = Column(String, nullable=True)
+    payment_id = Column(String, nullable=True)  # Добавленное поле PaymentId
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

@@ -42,7 +42,7 @@ async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
         if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
-            await callback_query.message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
+            await callback_query.message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):",
                                                 reply_markup=sub_inline)
             return
 
@@ -65,7 +65,7 @@ async def add_review(message: Message, state: FSMContext):
         print("Subscription status:", info.subscription_status)
 
         if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
-            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку:",
+            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):",
                                  reply_markup=sub_inline)
             return
 

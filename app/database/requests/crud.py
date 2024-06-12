@@ -50,14 +50,31 @@ def update_user_subscription(db: Session,
                              user_id: int,
                              subscription_status: str,
                              subscription_type: str,
-                             subscription_end_date,
-                             rebill_id: str):
+                             subscription_end_date: datetime,
+                             rebill_id: str,
+                             payment_id: str):
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         user.subscription_status = subscription_status
         user.subscription_type = subscription_type
-        user.subscription_end_date = subscription_end_date
+        user.subscription_end_date = subscription_end_date.replace(microsecond=0)  # Округляем до секунд
         user.rebill_id = rebill_id
+        user.payment_id = payment_id
+        user.updated_at = datetime.now()
+        db.commit()
+        return user
+    else:
+        print(f'User with ID {user_id} not found.')
+        return None
+
+
+def delete_user_subscription_details(db: Session, user_id: int):
+    user = db.query(User).filter(User.user_id == user_id).first()
+    if user:
+        user.subscription_status = None
+        user.subscription_type = None
+        user.subscription_end_date = None
+        user.rebill_id = None
         user.updated_at = datetime.now()
         db.commit()
         return user
