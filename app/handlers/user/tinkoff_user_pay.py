@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 import aiohttp
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
-from app.database.models.users import SessionLocal, User
+from sqlalchemy import select
+
+from app.database.models.users import User, async_session_maker
 from app.database.requests.crud import get_user_info, update_user_subscription
 
 tinkoff_router = Router()
@@ -17,11 +19,11 @@ class SessionManager:
         self.db = None
 
     async def __aenter__(self):
-        self.db = SessionLocal()
+        self.db = async_session_maker()
         return self.db
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+        await self.db.close()
 
 
 class TinkoffAPI:
@@ -141,11 +143,15 @@ async def get_rebill_id(order_id, payment_id):
         return None
 
 
-async def check_payment_status_and_update_db(callback_query: CallbackQuery, payment_id, user_id, subscription_type):
+async def check_payment_status_and_update_db(callback_query: CallbackQuery,
+                                             payment_id,
+                                             user_id,
+                                             subscription_type):
     print("Запуск check_payment_status_and_update_db")
     try:
         async with SessionManager() as db:
-            user_info = get_user_info(db=db, user_id=user_id)
+            user_info = await get_user_info(db=db,
+                                            user_id=user_id)
             if not user_info:
                 await callback_query.message.answer("Не удалось найти информацию о пользователе.")
                 return
@@ -155,111 +161,143 @@ async def check_payment_status_and_update_db(callback_query: CallbackQuery, paym
                     payment_status_response = await tinkoff_api.get_payment_status(payment_id)
                     if payment_status_response["Success"]:
                         if payment_status_response["Status"] == "CONFIRMED":
-                            await asyncio.sleep(5)  # Ждем 5 секунд перед запросом к серверу для получения rebill_id
+                            await asyncio.sleep(5)
                             rebill_id = await get_rebill_id(payment_status_response["OrderId"], payment_id)
                             if rebill_id:
-                                subscription_end_date = datetime.now() + timedelta(days=30)  # Подписка на 30 дней
-                                update_user_subscription(db, user_id, subscription_status="ACTIVE",
-                                                         subscription_type=subscription_type,
-                                                         subscription_end_date=subscription_end_date,
-                                                         rebill_id=rebill_id, payment_id=payment_id)
+                                subscription_end_date = datetime.now() + timedelta(days=30)
+                                async with SessionManager() as update_db:
+                                    await update_user_subscription(update_db,
+                                                                   user_id,
+                                                                   subscription_status="ACTIVE",
+                                                                   subscription_type=subscription_type,
+                                                                   subscription_end_date=subscription_end_date,
+                                                                   rebill_id=rebill_id, payment_id=payment_id)
                                 await callback_query.message.answer(
                                     "Оплата успешно подтверждена и подписка активирована.")
                                 print(f"Подписка активирована для пользователя {user_id}")
                                 return
                             else:
                                 await callback_query.message.answer(
-                                    "Ошибка при получении RebillId, обратитесь в поддержку.")
+                                    "Ошибка! Обратитесь в поддержку или попробуйте снова.")
                                 return
                         elif payment_status_response["Status"] in ["CANCELED", "REJECTED"]:
                             await callback_query.message.answer("Операция отменена.")
                             return
                     else:
                         await callback_query.message.answer(
-                            "Ошибка при проверке статуса платежа, обратитесь в поддержку.")
+                            "Ошибка, обратитесь в поддержку или попробуйте снова.")
                         return
                 except Exception as e:
                     print(f"Ошибка в check_payment_status_and_update_db при проверке статуса: {e}")
                     await callback_query.message.answer("Ошибка при проверке статуса платежа, обратитесь в поддержку.")
                     return
-                await asyncio.sleep(43200)  # Ждем 12 часов перед следующей проверкой
+                await asyncio.sleep(10)
             await callback_query.message.answer(
                 "Вы не оплатили подписку в течение 30 дней. Пожалуйста, попробуйте снова.")
     except Exception as e:
         print(f"Ошибка в check_payment_status_and_update_db: {e}")
 
 
-async def confirm_subscribe(callback_query: CallbackQuery):
-    await callback_query.message.answer(
-        "Даю согласие на <a href='https://telegra.ph/Soglasie-na-obrabotku-personalnyh-dannyh-06-12'>Обработку персональных данных</a> и "
-        "<a href='https://telegra.ph/Soglasie-na-sohranenie-uchetnyh-dannyh-dlya-budushchih-tranzakcij-06-12'>Согласие на сохранение учетных данных для будущих транзакций</a>",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Да", callback_data="user_agree")],
-            [InlineKeyboardButton(text="Нет", callback_data="user_disagree")]
-        ])
-    )
+async def confirm_subscribe(callback_query: CallbackQuery, subscription_type: str):
+    try:
+        await callback_query.message.answer(
+            "Даю согласие на "
+            "<a href='https://telegra.ph/Soglasie-na-obrabotku-personalnyh-dannyh-06-12'>Обработку персональных данных</a> и "
+            "<a href='https://telegra.ph/Soglasie-na-sohranenie-uchetnyh-dанных-для-будущих-транзакций-06-12'>Согласие на сохранение учетных данных для будущих транзакций</a>",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Да", callback_data=f"user_agree_{subscription_type}")],
+                [InlineKeyboardButton(text="Нет", callback_data="user_disagree")]
+            ])
+        )
+    except Exception as e:
+        print(e)
 
 
-@tinkoff_router.callback_query(F.data == "user_agree")
+@tinkoff_router.callback_query(F.data.startswith("user_agree_"))
 async def user_agree(callback_query: CallbackQuery):
-    user_id = callback_query.from_user.id
-    order_id = f"{user_id}_{int(time.time())}"
+    try:
+        user_id = callback_query.from_user.id
+        subscription_type = callback_query.data.split("_")[2]  # Получаем тип подписки из callback_data
 
-    async with SessionManager() as db:
-        user_info = get_user_info(db=db, user_id=user_id)
-        if not user_info or not user_info.customer_key:
-            await callback_query.message.answer("Ошибка при получении данных пользователя, обратитесь в поддержку.")
+        async with SessionManager() as db:
+            user_info = await get_user_info(db=db, user_id=user_id)
+            if not user_info or not user_info.customer_key:
+                await callback_query.message.answer(
+                    "Ошибка при получении данных пользователя, обратитесь в поддержку.")
+                return
+
+        if subscription_type == "Проверка":
+            amount = 99900
+        elif subscription_type == "Анкета":
+            amount = 150000
+        elif subscription_type == "Проверка + Анкета":
+            amount = 99900
+        else:
+            await callback_query.message.answer("Неизвестный тип подписки, обратитесь в поддержку.")
             return
-        customer_key = user_info.customer_key
 
-    await callback_query.message.answer(
-        "<b>Соглашение с подпиской:</b>\n\n"
-        "<b>Сумма сделки:</b> 999р/мес или 1500р/мес\n"
-        "<b>Тип валюты:</b> рубли\n"
-        "<b>Правила отмены и возврата:</b> за 24 часа вы можете отменить подписку, также вернуть деньги при неиспользовании купленного функционала бота в соответствии с подпиской\n\n"
-        "<b>Контакт:</b> @esc222",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Согласен, оплатить", callback_data="proceed_payment")],
-            [InlineKeyboardButton(text="Отказаться", callback_data="user_decline")]
-        ])
-    )
+        description = subscription_type
+
+        await callback_query.message.answer(
+            f"<b>Соглашение с подпиской:</b>\n\n"
+            f"<b>Сумма сделки:</b> {amount / 100:.2f}р/мес\n\n"
+            f"<b>Тип подписки:</b> {subscription_type}\n\n"
+            "<b>Тип валюты:</b> рубли\n\n"
+            "<b>Правила отмены и возврата:</b> за 24 часа вы можете отменить подписку, также вернуть деньги при неиспользовании купленного функционала бота в соответствии с подпиской\n\n\n"
+            "<b>Контакт:</b> @esc222",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Согласен, оплатить", callback_data=f"proceed_payment_{subscription_type}")],
+                [InlineKeyboardButton(text="Отказаться", callback_data="user_decline")]
+            ])
+        )
+    except Exception as e:
+        print(e)
 
 
-@tinkoff_router.callback_query(F.data == "proceed_payment")
+@tinkoff_router.callback_query(F.data.startswith("proceed_payment_"))
 async def proceed_payment(callback_query: CallbackQuery):
-    user_id = callback_query.from_user.id
-    order_id = f"{user_id}_{int(time.time())}"
+    try:
+        user_id = callback_query.from_user.id
+        subscription_type = callback_query.data.split("_")[2]  # Получаем тип подписки из callback_data
+        order_id = f"{user_id}_{int(time.time())}"
 
-    async with SessionManager() as db:
-        user_info = get_user_info(db=db, user_id=user_id)
-        if not user_info or not user_info.customer_key:
-            await callback_query.message.answer("Ошибка при получении данных пользователя, обратитесь в поддержку.")
+        async with SessionManager() as db:
+            user_info = await get_user_info(db=db, user_id=user_id)
+            if not user_info or not user_info.customer_key:
+                await callback_query.message.answer("Ошибка при получении данных пользователя, обратитесь в поддержку.")
+                return
+            customer_key = user_info.customer_key
+
+        if subscription_type == "Проверка":
+            amount = 99900  # 999 рублей в копейках
+            description = "Проверка"
+        elif subscription_type == "Анкета":
+            amount = 150000  # 1500 рублей в копейках
+            description = "Анкета"
+        elif subscription_type == "Проверка + Анкета":
+            amount = 249900  # 2499 рублей в копейках
+            description = "Проверка + Анкета"
+        else:
+            await callback_query.message.answer("Неизвестный тип подписки, обратитесь в поддержку.")
             return
-        customer_key = user_info.customer_key
 
-    # Определение суммы в зависимости от типа подписки
-    if user_info.subscription_type == "Анкета":
-        amount = 150000  # 1500 рублей в копейках
-        description = "Подписка Анкета: 1500р/мес"
-    else:
-        amount = 99900  # 999 рублей в копейках
-        description = "Подписка: 999р/мес"
+        payment_response = await tinkoff_api.init_payment(amount, order_id, description, customer_key)
+        if payment_response["Success"]:
+            payment_id = payment_response["PaymentId"]
+            payment_url = payment_response["PaymentURL"]
 
-    payment_response = await tinkoff_api.init_payment(amount, order_id, description, customer_key)
-    if payment_response["Success"]:
-        payment_id = payment_response["PaymentId"]
-        payment_url = payment_response["PaymentURL"]
+            # Создаем inline кнопку с URL
+            payment_button = [
+                [InlineKeyboardButton(text="Оплатить", url=payment_url)]
+            ]
+            sub_inline = InlineKeyboardMarkup(inline_keyboard=payment_button)
 
-        # Создаем inline кнопку с URL
-        payment_button = [
-            [InlineKeyboardButton(text="Оплатить", url=payment_url)]
-        ]
-        sub_inline = InlineKeyboardMarkup(inline_keyboard=payment_button)
-
-        await callback_query.message.answer("Для оплаты нажмите на кнопку ниже:", reply_markup=sub_inline)
-        await asyncio.create_task(check_payment_status_and_update_db(callback_query, payment_id, user_id, description))
-    else:
-        await callback_query.message.answer("Произошла ошибка при инициализации платежа, обратитесь в поддержку.")
+            await callback_query.message.answer("Для оплаты нажмите на кнопку ниже:", reply_markup=sub_inline)
+            await asyncio.create_task(check_payment_status_and_update_db(callback_query, payment_id, user_id, subscription_type))
+        else:
+            await callback_query.message.answer("Произошла ошибка при инициализации платежа, обратитесь в поддержку.")
+    except Exception as e:
+        print(e)
 
 
 @tinkoff_router.callback_query(F.data == "user_disagree")
@@ -276,89 +314,93 @@ async def user_decline(callback_query: CallbackQuery):
 async def check999_subscribe(callback_query: CallbackQuery):
     print("Запуск check999_subscribe")
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query)
+    await confirm_subscribe(callback_query, "Проверка")
 
 
 @tinkoff_router.callback_query(F.data == "questionnaire1500")
 async def questionnaire1500_subscribe(callback_query: CallbackQuery):
     print("Запуск questionnaire1500_subscribe")
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query)
+    await confirm_subscribe(callback_query, "Анкета")
 
 
 @tinkoff_router.callback_query(F.data == "check_and_questionnaire")
 async def check_and_questionnaire_subscribe(callback_query: CallbackQuery):
-    print("Запуск check_and_questionnaire_subscribe")
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query)
+    await confirm_subscribe(callback_query, "Проверка + Анкета")
 
 
 async def check_subscriptions():
-    print("Запуск check_subscriptions")
     try:
         async with SessionManager() as db:
-            users = db.query(User).filter(User.subscription_status == "ACTIVE").all()
+            result = await db.execute(select(User).filter(User.subscription_status == "ACTIVE"))
+            users = result.scalars().all()
             now = datetime.now().replace(microsecond=0)
             print(f"Текущее время: {now}")
 
             for user in users:
                 subscription_end_datetime = user.subscription_end_date
 
-                print(f"Время окончания подписки для пользователя {user.id}: {subscription_end_datetime}")
+                print(f"Время окончания подписки для пользователя {user.user_id}: {subscription_end_datetime}")
 
                 if subscription_end_datetime <= now:
-                    print(f"Подписка истекла для пользователя {user.id}")
+                    print(f"Подписка истекла для пользователя {user.user_id}")
                     await renew_subscription(user)
                 else:
-                    print(f"Подписка активна для пользователя {user.id}")
+                    print(f"Подписка активна для пользователя {user.user_id}")
     except Exception as e:
         print(f"Ошибка в check_subscriptions: {e}")
 
 
 async def renew_subscription(user):
-    print(f"Запуск renew_subscription для пользователя {user.id}")
+    print(f"Запуск renew_subscription для пользователя {user.user_id}")
     try:
-        order_id = f"{user.id}_{int(time.time())}"
+        order_id = f"{user.user_id}_{int(time.time())}"
 
-        # Определяем сумму в зависимости от типа подписки
-        if user.subscription_type == "Анкета":
-            amount = 150000  # Сумма в копейках (пример: 1500 рублей)
+        if user.subscription_type == "Проверка":
+            amount = 99900  # 999 рублей в копейках
+            description = "Продление подписки: Проверка"
+        elif user.subscription_type == "Анкета":
+            amount = 150000  # 1500 рублей в копейках
+            description = "Продление подписки: Анкета"
+        elif user.subscription_type == "Проверка + Анкета":
+            amount = 249900  # 2499 рублей в копейках
+            description = "Продление подписки: Проверка + Анкета"
         else:
-            amount = 99900  # Сумма в копейках (пример: 999 рублей)
+            print(f"Неизвестный тип подписки для пользователя {user.user_id}")
+            return
 
-        # Инициируем платеж
-        payment_response = await tinkoff_api.init_payment(amount, order_id, "Продление подписки", user.customer_key)
+        payment_response = await tinkoff_api.init_payment(amount, order_id, description, user.customer_key)
+        print(f"Инициация платежа: {payment_response}")
         if payment_response["Success"]:
             payment_id = payment_response["PaymentId"]
 
-            # Выполняем рекуррентный платеж
             charge_response = await tinkoff_api.charge_payment(payment_id, user.rebill_id)
+            print(f"Результат рекуррентного платежа: {charge_response}")
             if charge_response["Success"] and charge_response["Status"] == "CONFIRMED":
-                # Обновляем данные пользователя в базе
                 async with SessionManager() as db:
-                    user_info = get_user_info(db=db, user_id=user.id)
-                    if user_info:
+                    user_info = await get_user_info(db=db, user_id=user.user_id)
+                    print(f"Информация о пользователе: {user_info}")
+
+                if user_info:
+                    async with SessionManager() as db:
                         subscription_end_date = (datetime.now() + timedelta(days=30)).replace(
-                            microsecond=0)  # Подписка на 30 дней
-                        update_user_subscription(
-                            db, user.id,
+                            microsecond=0)
+                        await update_user_subscription(
+                            db, user.user_id,
                             subscription_status="ACTIVE",
                             subscription_type=user.subscription_type,
                             subscription_end_date=subscription_end_date,
                             rebill_id=user.rebill_id,
                             payment_id=payment_id
                         )
-                        print(f"Подписка пользователя {user.id} успешно продлена до {subscription_end_date}.")
-                    else:
-                        print(f"Не удалось найти информацию о пользователе {user.id}.")
+                        print(f"Подписка пользователя {user.user_id} успешно продлена до {subscription_end_date}.")
+                else:
+                    print(f"Не удалось найти информацию о пользователе {user.user_id}.")
             else:
                 print(
-                    f"Ошибка при выполнении рекуррентного платежа для пользователя {user.id}: {charge_response['Message']}")
+                    f"Ошибка при выполнении рекуррентного платежа для пользователя {user.user_id}: {charge_response['Message']}")
         else:
-            print(f"Ошибка при инициализации платежа для пользователя {user.id}: {payment_response['Message']}")
+            print(f"Ошибка при инициализации платежа для пользователя {user.user_id}: {payment_response['Message']}")
     except Exception as e:
-        print(f"Ошибка в renew_subscription для пользователя {user.id}: {e}")
-
-
-
-
+        print(f"Ошибка в renew_subscription для пользователя {user.user_id}: {e}")

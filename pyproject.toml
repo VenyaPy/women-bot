@@ -8,9 +8,10 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.12"
 aiogram = "^3.7.0"
-sqlalchemy = "^2.0.30"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.30"}
 redis = "^5.0.5"
 apscheduler = "^3.10.4"
+aiosqlite = "^0.20.0"
 
 
 [build-system]

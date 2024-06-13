@@ -36,11 +36,9 @@ dp.include_routers(start_router,
 
 async def main() -> None:
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(check_subscriptions, 'interval', seconds=43200)  # Проверка каждые 10 секунд
+    scheduler.add_job(check_subscriptions, 'interval', seconds=21600)  # Проверка каждые 10 секунд
     scheduler.start()
     await dp.start_polling(bot)
-
-
 
 
 if __name__ == "__main__":

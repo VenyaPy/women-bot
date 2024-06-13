@@ -7,7 +7,7 @@ from aiogram.types import (
     CallbackQuery, InlineKeyboardButton
 )
 
-from app.database.models.users import SessionLocal
+from app.database.models.users import AsyncSession, async_session_maker
 from app.database.requests.crud import get_users_with_active_subscription, get_female_users, get_male_users, \
     get_all_user_ids
 from app.filters.chat_types import IsAdmin
@@ -18,12 +18,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 admin_mailing_router = Router()
@@ -162,15 +162,15 @@ async def send_post(callback: CallbackQuery, state: FSMContext) -> None:
 
         user_ids = []
 
-        with SessionManager() as db:
+        async with SessionManager() as db:
             if recipient_category == "send_to_all":
-                user_ids = get_all_user_ids(db)
+                user_ids = await get_all_user_ids(db)
             elif recipient_category == "send_mail_to_mens":
-                user_ids = [user.user_id for user in get_male_users(db)]
+                user_ids = [user.user_id for user in await get_male_users(db)]
             elif recipient_category == "send_mail_to_women":
-                user_ids = [user.user_id for user in get_female_users(db)]
+                user_ids = [user.user_id for user in await get_female_users(db)]
             elif recipient_category == "send_mail_to_subscribers":
-                user_ids = [user.user_id for user in get_users_with_active_subscription(db)]
+                user_ids = [user.user_id for user in await get_users_with_active_subscription(db)]
 
         successful_sends = 0
         failed_sends = 0

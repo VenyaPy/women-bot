@@ -4,7 +4,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery
-from app.database.models.users import SessionLocal
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_users_with_active_subscription, get_female_users, get_male_users, \
     get_all_user_ids, get_user_info, delete_user_subscription_details
 from app.filters.chat_types import IsAdmin
@@ -15,12 +15,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 
@@ -50,8 +50,8 @@ async def process_user_id(message: Message, state: FSMContext):
         return
 
     try:
-        with SessionManager() as db:
-            user_info = get_user_info(db, user_id)
+        async with SessionManager() as db:
+            user_info = await get_user_info(db, user_id)
             if user_info:
                 user = delete_user_subscription_details(db, user_id)
                 if user:

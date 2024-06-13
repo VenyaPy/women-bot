@@ -3,7 +3,9 @@ import random
 from aiogram import Router, F, types
 from aiogram.filters import CommandStart
 from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardMarkup, InputMediaPhoto, FSInputFile
-from app.database.models.users import SessionLocal, User
+from sqlalchemy import select
+
+from app.database.models.users import User, async_session_maker
 from app.database.requests.crud import add_or_update_user, update_user_city, get_all_profiles, get_user_info, get_user_city
 from app.handlers.admin.admin_start import admin_start_menu
 from app.templates.keyboards.keyboard_buttons import prev_next_button, reviews_button
@@ -17,12 +19,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 @start_router.message(CommandStart())
 async def start(message: Message):
@@ -33,15 +35,15 @@ async def start(message: Message):
     if user_id in ADMINS:
         await admin_start_menu(message)
     else:
-        with SessionManager() as db:
-            is_user = get_user_info(db=db, user_id=message.from_user.id)
-            city = get_user_city(db=db, user_id=user_id)
+        async with SessionManager() as db:
+            is_user = await get_user_info(db=db, user_id=message.from_user.id)
+            city = await get_user_city(db=db, user_id=user_id)
 
         if is_user and is_user.gender == "Мужчина":
             keyboard = ReplyKeyboardMarkup(keyboard=prev_next_button, resize_keyboard=True, one_time_keyboard=False)
 
-            with SessionManager() as db:
-                profiles = get_all_profiles(db=db, city=city)
+            async with SessionManager() as db:
+                profiles = await get_all_profiles(db=db, city=city)
 
             if not profiles:
                 inline_other_city = InlineKeyboardMarkup(inline_keyboard=other_city)
@@ -68,6 +70,10 @@ async def start(message: Message):
                                                  f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>")
                          for photo_path in photos_paths]
                 await message.answer_media_group(media)
+                await message.answer(
+                    text="Подсказка! Вы можете использовать стрелки на клавиатуре для переключения между анкетами.",
+                    reply_markup=keyboard)
+
             else:
                 await message.answer(
                     text=f"<b>Имя:</b> {random_profile.name}\n"
@@ -100,8 +106,8 @@ async def process_gender_selection(callback_query: CallbackQuery):
 
     gender = 'Мужчина' if callback_query.data == 'man_gender' else 'Женщина'
 
-    with SessionManager() as db:
-        add_or_update_user(user_id=user_id, gender=gender, db=db)
+    async with SessionManager() as db:
+        await add_or_update_user(user_id=user_id, gender=gender, db=db)
 
     city_inline = InlineKeyboardMarkup(inline_keyboard=city_choose)
     await callback_query.message.answer(text="Выберите свой город:", reply_markup=city_inline)
@@ -113,9 +119,10 @@ async def process_city_selection(callback_query: CallbackQuery):
     city_data = callback_query.data
     city = city_data.split('_', 1)[1]
 
-    with SessionManager() as db:
-        update_user_city(db=db, user_id=user_id, city=city)
-        user = db.query(User).filter(User.user_id == user_id).first()
+    async with SessionManager() as db:
+        await update_user_city(db=db, user_id=user_id, city=city)
+        result = await db.execute(select(User).filter(User.user_id == user_id))
+        user = result.scalars().first()
         gender = user.gender if user else None
 
     if gender == 'Женщина':
@@ -134,8 +141,8 @@ async def process_city_selection(callback_query: CallbackQuery):
         await callback_query.message.delete()
         keyboard = ReplyKeyboardMarkup(keyboard=prev_next_button, resize_keyboard=True, one_time_keyboard=False)
 
-        with SessionManager() as db:
-            profiles = get_all_profiles(db=db, city=city)
+        async with SessionManager() as db:
+            profiles = await get_all_profiles(db=db, city=city)
 
         if not profiles:
             inline_other_city = InlineKeyboardMarkup(inline_keyboard=other_city)
@@ -164,6 +171,7 @@ async def process_city_selection(callback_query: CallbackQuery):
                                              f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>")
                      for photo_path in photos_paths]
             await callback_query.message.answer_media_group(media)
+            await callback_query.message.answer(text="Подсказка! Вы можете использовать стрелки на клавиатуре для переключения между анкетами.", reply_markup=keyboard)
         else:
             await callback_query.message.answer(
                 text=f"<b>Имя:</b> {random_profile.name}\n"

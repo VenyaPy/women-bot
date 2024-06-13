@@ -7,7 +7,7 @@ from aiogram import types
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from app.database.models.users import SessionLocal
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_user_info, send_women_review
 from app.templates.keyboards.inline_buttons import women_subscribe, positive_or_negative, send_or_delete_review
 
@@ -18,12 +18,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 class Review(StatesGroup):
@@ -36,8 +36,8 @@ class Review(StatesGroup):
 async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
     try:
         user_id = callback_query.from_user.id
-        with SessionManager() as db:
-            info = get_user_info(db=db, user_id=user_id)
+        async with SessionManager() as db:
+            info = await get_user_info(db=db, user_id=user_id)
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
@@ -58,8 +58,8 @@ async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
 async def add_review(message: Message, state: FSMContext):
     try:
         user_id = message.from_user.id
-        with SessionManager() as db:
-            info = get_user_info(db=db, user_id=user_id)
+        async with SessionManager() as db:
+            info = await get_user_info(db=db, user_id=user_id)
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
         print("Subscription status:", info.subscription_status)
@@ -147,8 +147,8 @@ async def send_done_review(callback: CallbackQuery, state: FSMContext):
             type = data.get("type", "")
             number = data.get("number", "")
             text = data.get("text", "")
-            with SessionManager() as db:
-                send_women_review(db=db, user_id=user_id, type=type, number=number, text=text)
+            async with SessionManager() as db:
+                await send_women_review(db=db, user_id=user_id, type=type, number=number, text=text)
             await callback.message.answer("Отзыв отправлен. Спасибо!")
             await state.clear()
     except Exception as e:

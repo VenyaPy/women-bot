@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import re
 
-from app.database.models.users import SessionLocal
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_user_info, get_positive_reviews, get_negative_reviews
 from app.templates.keyboards.inline_buttons import women_subscribe, add_or_not_add_review
 
@@ -16,12 +16,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 @women_check_router.callback_query(F.data == "dont_want_to_add")
@@ -55,9 +55,9 @@ async def schedule_review_request(bot: Bot, chat_id: int, phone_number: str):
                                          f"неприятностей.", reply_markup=inline_add_review)
 
 
-def get_reviews(db, phone_number):
-    positive_reviews = get_positive_reviews(db, phone_number)
-    negative_reviews = get_negative_reviews(db, phone_number)
+async def get_reviews(db, phone_number):
+    positive_reviews = await get_positive_reviews(db, phone_number)
+    negative_reviews = await get_negative_reviews(db, phone_number)
     return positive_reviews, negative_reviews
 
 
@@ -74,8 +74,8 @@ def format_reviews(reviews, review_type):
 @women_check_router.message(F.text == "Проверить номер")
 async def check_number(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    with SessionManager() as db:
-        info = get_user_info(db=db, user_id=user_id)
+    async with SessionManager() as db:
+        info = await get_user_info(db=db, user_id=user_id)
 
     sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
@@ -99,8 +99,8 @@ async def process_phone_number(message: Message, state: FSMContext):
             await message.answer(text=formatted_number)
             await message.answer(text="Введите номер телефона в формате: 8 *** *** ** **")
         else:
-            with SessionManager() as db:
-                positive_reviews, negative_reviews = get_reviews(db, formatted_number)
+            async with SessionManager() as db:
+                positive_reviews, negative_reviews = await get_reviews(db, formatted_number)
 
             response = ""
             if positive_reviews or negative_reviews:

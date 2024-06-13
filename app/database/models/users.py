@@ -1,11 +1,14 @@
-from sqlalchemy import create_engine, Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text
-from sqlalchemy.orm import sessionmaker, relationship, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
+from sqlalchemy import Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text
 from datetime import datetime
 
+DATABASE_URL = "sqlite+aiosqlite:///app/database/women_bot.db"
 
-engine = create_engine('sqlite:///app/database/women_bot.db', echo=True)
-SessionLocal = sessionmaker(bind=engine)
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
+
 
 
 class User(Base):
@@ -95,4 +98,3 @@ class AdminAction(Base):
     created_at = Column(DateTime, default=datetime.now)
 
 
-Base.metadata.create_all(engine)

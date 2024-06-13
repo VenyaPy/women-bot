@@ -1,6 +1,7 @@
 from aiogram.filters import Filter
 from aiogram import Bot, types
-from app.database.models.users import SessionLocal
+
+from app.database.models.users import async_session_maker
 from config import ADMINS
 
 
@@ -8,12 +9,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 class IsAdmin(Filter):

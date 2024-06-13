@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery, InputMed
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.exc import SQLAlchemyError
-from app.database.models.users import SessionLocal
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_user_info, get_user_city, create_profile, is_profile_info, delete_profile
 from app.templates.keyboards.inline_buttons import women_subscribe, enough_photo_women, girl_profile_choose
 
@@ -16,20 +16,20 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 @women_profile_router.callback_query(F.data == "del_my_profile")
 async def delete_my_profile_from_bd(callback_query: CallbackQuery):
     user_id = callback_query.from_user.id
 
-    with SessionManager() as db:
-        delete_profile(db=db, user_id=user_id)
+    async with SessionManager() as db:
+        await delete_profile(db=db, user_id=user_id)
 
 
     await callback_query.message.answer(text="Ваша анкета удалена! Теперь вы можете добавить новую.")
@@ -58,9 +58,9 @@ async def add_women_profile(message: Message, state: FSMContext):
 
         inline_girl_del = InlineKeyboardMarkup(inline_keyboard=girl_profile_choose)
 
-        with SessionManager() as db:
-            info = get_user_info(db=db, user_id=user_id)
-            is_profile = is_profile_info(db=db, user_id=user_id)
+        async with SessionManager() as db:
+            info = await get_user_info(db=db, user_id=user_id)
+            is_profile = await is_profile_info(db=db, user_id=user_id)
 
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
@@ -291,9 +291,11 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
     data = await state.get_data()
 
     try:
-        with SessionManager() as db:
-            city = get_user_city(db=db, user_id=callback_query.from_user.id)
-            create_profile(
+        async with SessionManager() as db:
+            city = await get_user_city(db=db, user_id=callback_query.from_user.id)
+
+        async with SessionManager() as db:
+            await create_profile(
                 db=db,
                 user_id=callback_query.from_user.id,
                 name=data.get("name", ""),
@@ -317,7 +319,10 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg")]
+            photos_paths = [
+                f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg" for
+                i in range(1, 4) if os.path.exists(
+                    f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg")]
             if photos_paths:
                 media = [InputMediaPhoto(media=FSInputFile(path=photo_path),
                                          caption=f"<b>Имя:</b> {data.get('name')}\n<b>Возраст:</b> {data.get('age')}\n"

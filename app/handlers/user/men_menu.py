@@ -3,7 +3,7 @@ import os
 from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, InputMediaPhoto, FSInputFile, ReplyKeyboardMarkup
 
-from app.database.models.users import SessionLocal
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_user_city, get_all_profiles
 from app.templates.keyboards.inline_buttons import women_subscribe, city_choose, other_city
 from app.templates.keyboards.keyboard_buttons import prev_next_button
@@ -15,12 +15,12 @@ class SessionManager:
     def __init__(self):
         self.db = None
 
-    def __enter__(self):
-        self.db = SessionLocal()
+    async def __aenter__(self):
+        self.db = async_session_maker()
         return self.db
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.db.close()
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.db.close()
 
 
 current_profile_index = {}
@@ -29,9 +29,9 @@ current_profile_index = {}
 @men_router.message(F.text.lower() == '>>>')
 async def next_profile(message: Message):
     user_id = message.from_user.id
-    with SessionManager() as db:
-        city = get_user_city(db=db, user_id=user_id)
-        profiles = get_all_profiles(db, city=city)
+    async with SessionManager() as db:
+        city = await get_user_city(db=db, user_id=user_id)
+        profiles = await get_all_profiles(db, city=city)
 
     if user_id not in current_profile_index:
         current_profile_index[user_id] = 0
@@ -43,9 +43,9 @@ async def next_profile(message: Message):
 @men_router.message(F.text.lower() == '<<<')
 async def prev_profile(message: Message):
     user_id = message.from_user.id
-    with SessionManager() as db:
-        city = get_user_city(db=db, user_id=user_id)
-        profiles = get_all_profiles(db, city=city)
+    async with SessionManager() as db:
+        city = await get_user_city(db=db, user_id=user_id)
+        profiles = await get_all_profiles(db, city=city)
 
     if user_id not in current_profile_index:
         current_profile_index[user_id] = 0
@@ -98,9 +98,9 @@ async def change_city(callback_query: CallbackQuery):
 @men_router.callback_query(F.data == "update_profile_list")
 async def update_profile_for_mens(message: Message):
     user_id = message.from_user.id
-    with SessionManager() as db:
-        city = get_user_city(db=db, user_id=user_id)
-        profiles = get_all_profiles(db, city=city)
+    async with SessionManager() as db:
+        city = await get_user_city(db=db, user_id=user_id)
+        profiles = await get_all_profiles(db, city=city)
 
     if profiles:
 
