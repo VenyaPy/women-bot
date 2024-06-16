@@ -8,6 +8,12 @@ gender_start = [
     ]
 ]
 
+read_faq_inline = [
+    [
+        InlineKeyboardButton(text="Прочитать инструкцию", callback_data="faq_reader")
+    ]
+]
+
 
 city_choose = [
     [InlineKeyboardButton(text="Москва", callback_data="city_moscow")],
@@ -58,10 +64,6 @@ politic_buttons = [
     [
         InlineKeyboardButton(text="Оферта",
                              url="https://telegra.ph/Oferta-06-12-2")
-    ],
-    [
-        InlineKeyboardButton(text="Оферта рекуррентных платежей",
-                             url="https://telegra.ph/Oferta-rekurentnyh-platezhej-06-12")
     ],
     [
         InlineKeyboardButton(text="Политика конфиденциальности",
@@ -144,7 +146,7 @@ users_of_mailing = [
         InlineKeyboardButton(text="Мужчинам", callback_data="send_mail_to_mens")
     ],
     [
-        InlineKeyboardButton(text="Женщинам", callback_data="send_mail_to_women")
+        InlineKeyboardButton(text="Неоформленным подпискам", callback_data="send_mail_to_women")
     ],
     [
         InlineKeyboardButton(text="Оформленным подпискам", callback_data="send_mail_to_subscribers")

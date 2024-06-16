@@ -4,7 +4,9 @@ import time
 from datetime import datetime, timedelta
 
 import aiohttp
-from aiogram import Router, F
+from aiogram import Router, F, types
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup
 from sqlalchemy import select
 
@@ -40,8 +42,17 @@ class TinkoffAPI:
         token = hashlib.sha256(token_str.encode('utf-8')).hexdigest()
         return token.lower()
 
-    async def init_payment(self, amount, order_id, description, customer_key):
+    async def init_payment(self, amount, order_id, description, customer_key, email):
         url = self.BASE_URL + "Init"
+        receipt_items = [
+            {
+                "Name": description,
+                "Price": amount,  # цена товара в копейках
+                "Quantity": 1,
+                "Amount": amount,  # общая стоимость товара в копейках
+                "Tax": "vat10"
+            }
+        ]
         params = {
             "TerminalKey": self.terminal_key,
             "Amount": str(amount),
@@ -49,6 +60,14 @@ class TinkoffAPI:
             "Description": description,
             "CustomerKey": customer_key,
             "Recurrent": "Y",
+            "DATA": {
+                "Email": email
+            },
+            "Receipt": {
+                "Email": email,
+                "Taxation": "osn",
+                "Items": receipt_items
+            }
         }
         ordered_keys = ['Amount', 'CustomerKey', 'Description', 'OrderId', 'Password', 'Recurrent', 'TerminalKey']
         params["Token"] = self.generate_token(params, ordered_keys)
@@ -147,7 +166,6 @@ async def check_payment_status_and_update_db(callback_query: CallbackQuery,
                                              payment_id,
                                              user_id,
                                              subscription_type):
-    print("Запуск check_payment_status_and_update_db")
     try:
         async with SessionManager() as db:
             user_info = await get_user_info(db=db,
@@ -188,77 +206,55 @@ async def check_payment_status_and_update_db(callback_query: CallbackQuery,
                             "Ошибка, обратитесь в поддержку или попробуйте снова.")
                         return
                 except Exception as e:
-                    print(f"Ошибка в check_payment_status_and_update_db при проверке статуса: {e}")
-                    await callback_query.message.answer("Ошибка при проверке статуса платежа, обратитесь в поддержку.")
+                    print(f"Ошибка в check_payment_status_and_update_db при проверке статуса для пользователя {user_id}: {e}")
                     return
                 await asyncio.sleep(10)
-            await callback_query.message.answer(
-                "Вы не оплатили подписку в течение 30 дней. Пожалуйста, попробуйте снова.")
     except Exception as e:
         print(f"Ошибка в check_payment_status_and_update_db: {e}")
 
 
-async def confirm_subscribe(callback_query: CallbackQuery, subscription_type: str):
+class PaymentState(StatesGroup):
+    waiting_for_email = State()
+    waiting_for_payment = State()
+
+
+async def proceed_payment(callback_query: CallbackQuery, subscription_type, state: FSMContext):
     try:
-        await callback_query.message.answer(
-            "Даю согласие на "
-            "<a href='https://telegra.ph/Soglasie-na-obrabotku-personalnyh-dannyh-06-12'>Обработку персональных данных</a> и "
-            "<a href='https://telegra.ph/Soglasie-na-sohranenie-uchetnyh-dанных-для-будущих-транзакций-06-12'>Согласие на сохранение учетных данных для будущих транзакций</a>",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Да", callback_data=f"user_agree_{subscription_type}")],
-                [InlineKeyboardButton(text="Нет", callback_data="user_disagree")]
-            ])
-        )
+        await callback_query.message.answer("Пожалуйста, введите ваш email для отправки чека.")
+        await state.update_data(subscription_type=subscription_type)
+        await state.set_state(PaymentState.waiting_for_email)
     except Exception as e:
         print(e)
 
 
-@tinkoff_router.callback_query(F.data.startswith("user_agree_"))
-async def user_agree(callback_query: CallbackQuery):
+@tinkoff_router.message(PaymentState.waiting_for_email)
+async def process_email(message: types.Message, state: FSMContext):
+    email = message.text
+    data = await state.get_data()
+    subscription_type = data.get("subscription_type")
+
+    # Validate email format (basic check)
+    if "@" not in email or "." not in email:
+        await message.answer("Неправильный формат email. Пожалуйста, введите корректный email.")
+        return
+
+    await state.update_data(email=email)
+    await message.answer(
+        "Спасибо! Теперь вы можете подтвердить оплату:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Согласен, оплатить", callback_data=f"confirm_payment_{subscription_type}")]
+        ])
+    )
+    await state.set_state(PaymentState.waiting_for_payment)
+
+
+@tinkoff_router.callback_query(F.data.startswith("confirm_payment_"))
+async def confirm_payment(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
     try:
-        user_id = callback_query.from_user.id
-        subscription_type = callback_query.data.split("_")[2]  # Получаем тип подписки из callback_data
-
-        async with SessionManager() as db:
-            user_info = await get_user_info(db=db, user_id=user_id)
-            if not user_info or not user_info.customer_key:
-                await callback_query.message.answer(
-                    "Ошибка при получении данных пользователя, обратитесь в поддержку.")
-                return
-
-        if subscription_type == "Проверка":
-            amount = 99900
-        elif subscription_type == "Анкета":
-            amount = 150000
-        elif subscription_type == "Проверка + Анкета":
-            amount = 99900
-        else:
-            await callback_query.message.answer("Неизвестный тип подписки, обратитесь в поддержку.")
-            return
-
-        description = subscription_type
-
-        await callback_query.message.answer(
-            f"<b>Соглашение с подпиской:</b>\n\n"
-            f"<b>Сумма сделки:</b> {amount / 100:.2f}р/мес\n\n"
-            f"<b>Тип подписки:</b> {subscription_type}\n\n"
-            "<b>Тип валюты:</b> рубли\n\n"
-            "<b>Правила отмены и возврата:</b> за 24 часа вы можете отменить подписку, также вернуть деньги при неиспользовании купленного функционала бота в соответствии с подпиской\n\n\n"
-            "<b>Контакт:</b> @esc222",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Согласен, оплатить", callback_data=f"proceed_payment_{subscription_type}")],
-                [InlineKeyboardButton(text="Отказаться", callback_data="user_decline")]
-            ])
-        )
-    except Exception as e:
-        print(e)
-
-
-@tinkoff_router.callback_query(F.data.startswith("proceed_payment_"))
-async def proceed_payment(callback_query: CallbackQuery):
-    try:
-        user_id = callback_query.from_user.id
-        subscription_type = callback_query.data.split("_")[2]  # Получаем тип подписки из callback_data
+        data = await state.get_data()
+        subscription_type = data.get("subscription_type")
+        email = data.get("email")
         order_id = f"{user_id}_{int(time.time())}"
 
         async with SessionManager() as db:
@@ -275,13 +271,15 @@ async def proceed_payment(callback_query: CallbackQuery):
             amount = 150000  # 1500 рублей в копейках
             description = "Анкета"
         elif subscription_type == "Проверка + Анкета":
-            amount = 249900  # 2499 рублей в копейках
+            amount = 99900
             description = "Проверка + Анкета"
         else:
             await callback_query.message.answer("Неизвестный тип подписки, обратитесь в поддержку.")
             return
 
-        payment_response = await tinkoff_api.init_payment(amount, order_id, description, customer_key)
+        payment_response = await tinkoff_api.init_payment(amount, order_id, description, customer_key, email)
+        print(payment_response)
+
         if payment_response["Success"]:
             payment_id = payment_response["PaymentId"]
             payment_url = payment_response["PaymentURL"]
@@ -293,41 +291,32 @@ async def proceed_payment(callback_query: CallbackQuery):
             sub_inline = InlineKeyboardMarkup(inline_keyboard=payment_button)
 
             await callback_query.message.answer("Для оплаты нажмите на кнопку ниже:", reply_markup=sub_inline)
-            await asyncio.create_task(check_payment_status_and_update_db(callback_query, payment_id, user_id, subscription_type))
+            await asyncio.create_task(
+                check_payment_status_and_update_db(callback_query, payment_id, user_id, subscription_type))
         else:
-            await callback_query.message.answer("Произошла ошибка при инициализации платежа, обратитесь в поддержку.")
+            await callback_query.message.answer("Ошибка платежа, обратитесь в поддержку.")
     except Exception as e:
-        print(e)
-
-
-@tinkoff_router.callback_query(F.data == "user_disagree")
-async def user_disagree(callback_query: CallbackQuery):
-    await callback_query.message.answer("Без согласия мы не можем оформить подписку по требованиям банка.")
-
-
-@tinkoff_router.callback_query(F.data == "user_decline")
-async def user_decline(callback_query: CallbackQuery):
-    await callback_query.message.answer("Вы отказались от подписки.")
+        print(f"Ошибка платежа для {user_id}: {e}")
 
 
 @tinkoff_router.callback_query(F.data == "check999")
-async def check999_subscribe(callback_query: CallbackQuery):
+async def check999_subscribe(callback_query: CallbackQuery, state: FSMContext):
     print("Запуск check999_subscribe")
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query, "Проверка")
+    await proceed_payment(callback_query, "Проверка", state=state)
 
 
 @tinkoff_router.callback_query(F.data == "questionnaire1500")
-async def questionnaire1500_subscribe(callback_query: CallbackQuery):
+async def questionnaire1500_subscribe(callback_query: CallbackQuery, state: FSMContext):
     print("Запуск questionnaire1500_subscribe")
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query, "Анкета")
+    await proceed_payment(callback_query, "Анкета", state=state)
 
 
 @tinkoff_router.callback_query(F.data == "check_and_questionnaire")
-async def check_and_questionnaire_subscribe(callback_query: CallbackQuery):
+async def check_and_questionnaire_subscribe(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
-    await confirm_subscribe(callback_query, "Проверка + Анкета")
+    await proceed_payment(callback_query, "Проверка + Анкета", state=state)
 
 
 async def check_subscriptions():
@@ -364,13 +353,13 @@ async def renew_subscription(user):
             amount = 150000  # 1500 рублей в копейках
             description = "Продление подписки: Анкета"
         elif user.subscription_type == "Проверка + Анкета":
-            amount = 249900  # 2499 рублей в копейках
+            amount = 99900
             description = "Продление подписки: Проверка + Анкета"
         else:
             print(f"Неизвестный тип подписки для пользователя {user.user_id}")
             return
 
-        payment_response = await tinkoff_api.init_payment(amount, order_id, description, user.customer_key)
+        payment_response = await tinkoff_api.init_payment(amount, order_id, description, user.customer_key, user.email)
         print(f"Инициация платежа: {payment_response}")
         if payment_response["Success"]:
             payment_id = payment_response["PaymentId"]

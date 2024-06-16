@@ -2,8 +2,11 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy import Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text
 from datetime import datetime
+import os
 
-DATABASE_URL = "sqlite+aiosqlite:///app/database/women_bot.db"
+
+# Создаем URL для подключения к базе данных
+DATABASE_URL = f"sqlite+aiosqlite:///app/database/women_bot.db"
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
@@ -21,9 +24,9 @@ class User(Base):
     subscription_type = Column(String, default="None")
     subscription_status = Column(String, default="False")
     subscription_end_date = Column(DateTime)
-    customer_key = Column(String, unique=True)  # Уникальный идентификатор клиента
+    customer_key = Column(String, unique=True)
     rebill_id = Column(String, nullable=True)
-    payment_id = Column(String, nullable=True)  # Добавленное поле PaymentId
+    payment_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 

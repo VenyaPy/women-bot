@@ -21,9 +21,19 @@ reviews_button = [
     ],
     [
         KeyboardButton(text="Помощь")
+    ]
+]
+
+reviews_button_delete = [
+    [
+        KeyboardButton(text="Добавить отзыв")
     ],
     [
-        KeyboardButton(text="Отменить подписку")
+        KeyboardButton(text="Проверить номер"),
+        KeyboardButton(text="Удалить анкету")
+    ],
+    [
+        KeyboardButton(text="Помощь")
     ]
 ]
 

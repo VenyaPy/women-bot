@@ -1,6 +1,9 @@
 import asyncio
-from aiogram import Router, F, Bot
-from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery
+import sys
+
+from aiogram import Router, F, Bot, types
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 import re
@@ -26,71 +29,122 @@ class SessionManager:
 
 @women_check_router.callback_query(F.data == "dont_want_to_add")
 async def cancel_want_review(callback_query: CallbackQuery):
-    await callback_query.message.delete()
-    await callback_query.message.answer(text="Ваше желание учтено!")
+    user_id = callback_query.from_user.id
+    try:
+        await callback_query.message.delete()
+        await callback_query.message.answer(text="Ваше желание учтено!")
+    except Exception as e:
+        print(f"Error in cancel_want_review for user_id {user_id}: {e}")
 
 
 class CheckPhoneNumber(StatesGroup):
     waiting_for_number = State()
     checking_review = State()
+    adding_review = State()
 
 
 def format_phone_number(phone_number: str) -> str:
-    digits = re.sub(r'\D', '', phone_number)
-    if len(digits) == 11 and digits.startswith('7'):
-        digits = '8' + digits[1:]
-    elif len(digits) == 10:
-        digits = '8' + digits
-    elif len(digits) != 11 or not digits.startswith('8'):
+    try:
+        digits = re.sub(r'\D', '', phone_number)
+
+        # Проверяем длину номера и корректируем его
+        if len(digits) == 11 and digits.startswith('7'):
+            digits = '8' + digits[1:]
+        elif len(digits) == 10:
+            digits = '8' + digits
+        elif len(digits) != 11 or not digits.startswith('8'):
+            return "Ошибка! Введите номер в верном формате."
+
+        # Форматируем номер
+        formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
+        return formatted_number
+    except Exception as e:
+        print(f"Error in format_phone_number: {e}")
         return "Ошибка! Введите номер в верном формате."
-    formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
-    return formatted_number
 
 
 async def schedule_review_request(bot: Bot, chat_id: int, phone_number: str):
-    await asyncio.sleep(10)  # Ожидаем 3 часа (10800 секунд)
-    inline_add_review = InlineKeyboardMarkup(inline_keyboard=add_or_not_add_review)
-    await bot.send_message(chat_id, text=f"Оставьте отзыв о номере {phone_number}. "
-                                         f"Это поможет другим индивидуалкам избежать "
-                                         f"неприятностей.", reply_markup=inline_add_review)
+    try:
+        await asyncio.sleep(60)
+
+        # Убираем пробелы из номера телефона
+        formatted_phone_number = phone_number.replace(" ", "")
+
+        add_or_not_add_review = [
+            [
+                InlineKeyboardButton(text="Добавить отзыв", callback_data=f"want_to_add_review_{formatted_phone_number}")
+            ],
+            [
+                InlineKeyboardButton(text="Не хочу добавлять", callback_data="dont_want_to_add")
+            ]
+        ]
+
+        inline_add_review = InlineKeyboardMarkup(inline_keyboard=add_or_not_add_review)
+        await bot.send_message(chat_id, text=f"Оставьте отзыв о номере {phone_number}. "
+                                             f"Это поможет другим девушкам избежать "
+                                             f"неприятностей.", reply_markup=inline_add_review)
+    except Exception as e:
+        print(f"Error in schedule_review_request for chat_id {chat_id}: {e}")
 
 
 async def get_reviews(db, phone_number):
-    positive_reviews = await get_positive_reviews(db, phone_number)
-    negative_reviews = await get_negative_reviews(db, phone_number)
-    return positive_reviews, negative_reviews
+    try:
+        positive_reviews = await get_positive_reviews(db, phone_number)
+        negative_reviews = await get_negative_reviews(db, phone_number)
+        return positive_reviews, negative_reviews
+    except Exception as e:
+        print(f"Error in get_reviews for phone_number {phone_number}: {e}")
+        return [], []
 
 
 def format_reviews(reviews, review_type):
-    formatted_reviews = []
-    for review in reviews:
-        formatted_review = (f"\n<b>Тип отзыва:</b> {review_type}\n"
-                            f"<b>Дата:</b> {review.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
-                            f"<b>Отзыв:</b> {review.review_text}\n")
-        formatted_reviews.append(formatted_review)
-    return formatted_reviews
+    try:
+        formatted_reviews = []
+        for review in reviews:
+            formatted_review = (f"\n<b>Тип отзыва:</b> {review_type}\n"
+                                f"<b>Дата:</b> {review.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n"
+                                f"<b>Отзыв:</b> {review.review_text}\n")
+            formatted_reviews.append(formatted_review)
+        return formatted_reviews
+    except Exception as e:
+        print(f"Error in format_reviews for review_type {review_type}: {e}")
+        return []
+
+
+@women_check_router.message(Command("finish"))
+async def shutdown_bot(message: Message):
+    await message.bot.session.close()
+    sys.exit()
 
 
 @women_check_router.message(F.text == "Проверить номер")
 async def check_number(message: Message, state: FSMContext):
     user_id = message.from_user.id
-    async with SessionManager() as db:
-        info = await get_user_info(db=db, user_id=user_id)
-
-    sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
-
-    if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
-        await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):",
-                             reply_markup=sub_inline)
+    try:
+        async with SessionManager() as db:
+            info = await get_user_info(db=db, user_id=user_id)
+    except Exception as e:
+        print(f"Error in check_number while getting user info for user_id {user_id}: {e}")
+        await message.answer("Произошла ошибка при проверке подписки.")
         return
 
-    await state.set_state(CheckPhoneNumber.waiting_for_number)
-    await message.answer(text="Введите номер телефона в формате: 8 *** *** ** **")
+    try:
+        sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
+        if info.subscription_type not in ["Проверка", "Проверка + Анкета"]:
+            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):",
+                                 reply_markup=sub_inline)
+            return
+
+        await state.set_state(CheckPhoneNumber.waiting_for_number)
+        await message.answer(text="Введите номер телефона в формате: 8 *** *** ** **")
+    except Exception as e:
+        print(f"Error in check_number for user_id {user_id}: {e}")
 
 
 @women_check_router.message(CheckPhoneNumber.waiting_for_number)
 async def process_phone_number(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     try:
         phone_number = message.text
         formatted_number = format_phone_number(phone_number)
@@ -99,34 +153,39 @@ async def process_phone_number(message: Message, state: FSMContext):
             await message.answer(text=formatted_number)
             await message.answer(text="Введите номер телефона в формате: 8 *** *** ** **")
         else:
-            async with SessionManager() as db:
-                positive_reviews, negative_reviews = await get_reviews(db, formatted_number)
+            try:
+                async with SessionManager() as db:
+                    positive_reviews, negative_reviews = await get_reviews(db, formatted_number)
+            except Exception as e:
+                print(f"Error in process_phone_number while getting reviews for user_id {user_id}: {e}")
+                await message.answer("Произошла ошибка при получении отзывов.")
+                return
 
-            response = ""
-            if positive_reviews or negative_reviews:
-                response = "Вот что нашлось:\n"
-                all_reviews = (format_reviews(positive_reviews, "Положительный") +
-                               format_reviews(negative_reviews, "Негативный"))
-                for review in all_reviews:
-                    if len(response) + len(review) > 4096:
-                        await message.answer(text=response)
-                        response = review
-                    else:
-                        response += review
-            else:
-                response = "Негативных отзывов не найдено. Рейтинг положительный."
+            try:
+                response = ""
+                if positive_reviews or negative_reviews:
+                    response = "Вот что нашлось:\n"
+                    all_reviews = (format_reviews(positive_reviews, "Положительный") +
+                                   format_reviews(negative_reviews, "Негативный"))
+                    for review in all_reviews:
+                        if len(response) + len(review) > 4096:
+                            await message.answer(text=response)
+                            response = review
+                        else:
+                            response += review
+                else:
+                    response = "Негативных отзывов не найдено. Рейтинг положительный."
 
-            await message.answer(text=response)
+                await message.answer(text=response)
 
-            await state.update_data(phone_number=formatted_number)
-            await state.set_state(CheckPhoneNumber.checking_review)
+                await state.update_data(phone_number=formatted_number)
+                await state.set_state(CheckPhoneNumber.checking_review)
 
-            await asyncio.create_task(schedule_review_request(message.bot,
-                                                              message.chat.id,
-                                                              formatted_number))
+                await asyncio.create_task(schedule_review_request(message.bot,
+                                                                  message.chat.id,
+                                                                  formatted_number))
+            except Exception as e:
+                print(f"Error in process_phone_number while formatting or sending reviews for user_id {user_id}: {e}")
+                await message.answer("Произошла ошибка при обработке отзывов.")
     except Exception as e:
-        await message.answer("Произошла ошибка при обработке номера телефона.")
-        print(f"Error in process_phone_number: {e}")
-
-
-
+        print(f"Error in process_phone_number for user_id {user_id}: {e}")

@@ -1,13 +1,18 @@
 import os
 import re
+import sys
+
 from aiogram import Router, F, Bot
-from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery, InputMediaPhoto, FSInputFile
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery, InputMediaPhoto, FSInputFile, \
+    ReplyKeyboardMarkup, InputFile, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.exc import SQLAlchemyError
 from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_user_info, get_user_city, create_profile, is_profile_info, delete_profile
 from app.templates.keyboards.inline_buttons import women_subscribe, enough_photo_women, girl_profile_choose
+from app.templates.keyboards.keyboard_buttons import reviews_button_delete, reviews_button
 
 women_profile_router = Router()
 
@@ -24,16 +29,112 @@ class SessionManager:
         await self.db.close()
 
 
-@women_profile_router.callback_query(F.data == "del_my_profile")
-async def delete_my_profile_from_bd(callback_query: CallbackQuery):
+class ProfileDeletion(StatesGroup):
+    confirm = State()
+
+
+# Функция для отображения анкеты
+async def show_profile(message: Message, profile):
+    try:
+        service_info = []
+        if profile.apartments:
+            service_info.append("Принимаю в апартаментах")
+        if profile.outcall:
+            service_info.append("Работаю на выезд")
+        service_text = " и ".join(service_info).capitalize()
+
+        photos_paths = [
+            f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
+            for i in range(1, 4)
+            if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
+        ]
+        if photos_paths:
+            media = [
+                InputMediaPhoto(
+                    media=FSInputFile(path=photo_path),
+                    caption=(
+                        f"<b>Имя:</b> {profile.name}\n"
+                        f"<b>Возраст:</b> {profile.age}\n"
+                        f"<b>Вес:</b> {profile.weight}\n"
+                        f"<b>Рост:</b> {profile.height}\n"
+                        f"<b>Размер груди:</b> {profile.breast_size}\n"
+                        f"<b>Стоимость за час:</b> {profile.hourly_rate} руб\n\n"
+                        f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                        f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
+                    ) if idx == 0 else None  # Подпись только для первой фотографии
+                )
+                for idx, photo_path in enumerate(photos_paths)
+            ]
+            await message.answer_media_group(media)
+        else:
+            await message.answer(
+                text=(
+                    f"<b>Имя:</b> {profile.name}\n"
+                    f"<b>Возраст:</b> {profile.age}\n"
+                    f"<b>Вес:</b> {profile.weight}\n"
+                    f"<b>Рост:</b> {profile.height}\n"
+                    f"<b>Размер груди:</b> {profile.breast_size}\n"
+                    f"<b>Стоимость за час:</b> {profile.hourly_rate} руб\n\n"
+                    f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                    f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
+                )
+            )
+    except Exception as e:
+        print(f"Error in show_profile: {e}")
+
+
+# Хэндлер для команды "Удалить анкету"
+@women_profile_router.message(F.text == "Удалить анкету")
+async def delete_my_profile_from_bd(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+
+    try:
+        async with SessionManager() as db:
+            profile = await is_profile_info(db=db, user_id=user_id)  # Получить анкету пользователя
+
+        if profile:
+            await show_profile(message, profile)  # Показать анкету
+
+            # Запросить подтверждение удаления
+            confirm_markup = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Да, удалить", callback_data="confirm_delete_profile")],
+                [InlineKeyboardButton(text="Нет, отменить", callback_data="cancel_delete_profile")]
+            ])
+            await message.answer("Вы уверены, что хотите удалить анкету?", reply_markup=confirm_markup)
+
+            await state.set_state(ProfileDeletion.confirm)
+        else:
+            await message.answer("У вас нет анкеты для удаления.")
+    except Exception as e:
+        print(f"Error in delete_my_profile_from_bd for user_id {user_id}: {e}")
+
+
+# Хэндлер для подтверждения удаления анкеты
+@women_profile_router.callback_query(F.data == "confirm_delete_profile")
+async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
 
-    async with SessionManager() as db:
-        await delete_profile(db=db, user_id=user_id)
+    try:
+        async with SessionManager() as db:
+            await delete_profile(db=db, user_id=user_id)
+
+        women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
+
+        await callback_query.message.answer("Ваша анкета удалена! Теперь вы можете добавить новую.",
+                                            reply_markup=women_review)
+        await state.clear()
+    except Exception as e:
+        print(f"Error in confirm_delete_profile for user_id {user_id}: {e}")
 
 
-    await callback_query.message.answer(text="Ваша анкета удалена! Теперь вы можете добавить новую.")
-
+# Хэндлер для отмены удаления анкеты
+@women_profile_router.callback_query(F.data == "cancel_delete_profile")
+async def cancel_delete_profile(callback_query: CallbackQuery, state: FSMContext):
+    try:
+        await callback_query.message.answer("Удаление анкеты отменено.")
+        await state.clear()
+    except Exception as e:
+        print(f"Error in cancel_delete_profile: {e}")
 
 
 class WomenProfile(StatesGroup):
@@ -53,9 +154,8 @@ class WomenProfile(StatesGroup):
 
 @women_profile_router.message(F.text == "Добавить анкету")
 async def add_women_profile(message: Message, state: FSMContext):
+    user_id = message.from_user.id
     try:
-        user_id = message.from_user.id
-
         inline_girl_del = InlineKeyboardMarkup(inline_keyboard=girl_profile_choose)
 
         async with SessionManager() as db:
@@ -76,19 +176,50 @@ async def add_women_profile(message: Message, state: FSMContext):
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")]
+            photos_paths = [
+                f"/Users/venya/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg"
+                for i in range(1, 4)
+                if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")
+            ]
             if photos_paths:
-                media = [InputMediaPhoto(media=FSInputFile(path=photo_path), caption=f"<b>Имя:</b> {is_profile.name}\n<b>Возраст:</b> {is_profile.age}\n<b>Вес:</b> {is_profile.weight}\n<b>Рост:</b> {is_profile.height}\n<b>Размер груди:</b> {is_profile.breast_size}\n<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n{service_text if service_text else 'Услуги не указаны'}\n\n<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>") for photo_path in photos_paths]
-                await message.answer_media_group(media)
-                await message.answer(text="Действия с анкетой:", reply_markup=inline_girl_del)
+                media = [
+                    InputMediaPhoto(
+                        media=FSInputFile(path=photo_path),
+                        caption=(
+                            f"<b>Имя:</b> {is_profile.name}\n"
+                            f"<b>Возраст:</b> {is_profile.age}\n"
+                            f"<b>Вес:</b> {is_profile.weight}\n"
+                            f"<b>Рост:</b> {is_profile.height}\n"
+                            f"<b>Размер груди:</b> {is_profile.breast_size}\n"
+                            f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n"
+                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                            f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
+                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                    )
+                    for idx, photo_path in enumerate(photos_paths)
+                ]
+                if media:
+                    await message.answer_media_group(media=media)
+                    await message.answer(text="Действия с анкетой:", reply_markup=inline_girl_del)
             else:
-                await message.answer(text=f"<b>Имя:</b> {is_profile.name}\n<b>Возраст:</b> {is_profile.age}\n<b>Вес:</b> {is_profile.weight}\n<b>Рост:</b> {is_profile.height}\n<b>Размер груди:</b> {is_profile.breast_size}\n<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n{service_text if service_text else 'Услуги не указаны'}\n\n<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>", reply_markup=inline_girl_del)
+                await message.answer(
+                    text=(
+                        f"<b>Имя:</b> {is_profile.name}\n"
+                        f"<b>Возраст:</b> {is_profile.age}\n"
+                        f"<b>Вес:</b> {is_profile.weight}\n"
+                        f"<b>Рост:</b> {is_profile.height}\n"
+                        f"<b>Размер груди:</b> {is_profile.breast_size}\n"
+                        f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n"
+                        f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                        f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
+                    ),
+                    reply_markup=inline_girl_del,
+                )
         else:
             await state.set_state(WomenProfile.name)
             await message.answer("Введите ваше имя, например: Ирина")
     except Exception as e:
-        await message.answer("Произошла ошибка при добавлении профиля. Попробуйте еще раз.")
-        print(f"Error in add_profile: {e}")
+        print(f"Error in add_women_profile for user_id {user_id}: {e}")
 
 
 @women_profile_router.message(WomenProfile.name)
@@ -98,7 +229,7 @@ async def process_name(message: Message, state: FSMContext):
         await message.answer("Введите ваш возраст, например: 25")
         await state.set_state(WomenProfile.age)
     except Exception as e:
-        print(e)
+        print(f"Error in process_name: {e}")
 
 
 @women_profile_router.message(WomenProfile.age)
@@ -111,7 +242,7 @@ async def process_age(message: Message, state: FSMContext):
         else:
             await message.answer("Введите возраст цифрами, например: 25")
     except Exception as e:
-        print(e)
+        print(f"Error in process_age: {e}")
 
 
 @women_profile_router.message(WomenProfile.weight)
@@ -124,7 +255,7 @@ async def process_weight(message: Message, state: FSMContext):
         else:
             await message.answer("Введите вес цифрами в кг, например: 55")
     except Exception as e:
-        print(e)
+        print(f"Error in process_weight: {e}")
 
 
 @women_profile_router.message(WomenProfile.height)
@@ -137,7 +268,7 @@ async def process_height(message: Message, state: FSMContext):
         else:
             await message.answer("Введите рост цифрами в см, например: 170")
     except Exception as e:
-        print(e)
+        print(f"Error in process_height: {e}")
 
 
 @women_profile_router.message(WomenProfile.breast_size)
@@ -150,7 +281,7 @@ async def process_breast_size(message: Message, state: FSMContext):
         else:
             await message.answer("Введите размер груди цифрами, например: 2")
     except Exception as e:
-        print(e)
+        print(f"Error in process_breast_size: {e}")
 
 
 @women_profile_router.message(WomenProfile.hourly_rate)
@@ -163,19 +294,27 @@ async def process_hourly_rate(message: Message, state: FSMContext):
         else:
             await message.answer("Введите цену за час цифрами, например: 2000")
     except Exception as e:
-        print(e)
+        print(f"Error in process_hourly_rate: {e}")
 
 
 def format_phone_number(phone_number: str) -> str:
-    digits = re.sub(r'\D', '', phone_number)
-    if len(digits) == 11 and digits.startswith('7'):
-        digits = '8' + digits[1:]
-    elif len(digits) == 10:
-        digits = '8' + digits
-    elif len(digits) != 11 or not digits.startswith('8'):
+    try:
+        digits = re.sub(r'\D', '', phone_number)
+
+        # Проверяем длину номера и корректируем его
+        if len(digits) == 11 and digits.startswith('7'):
+            digits = '8' + digits[1:]
+        elif len(digits) == 10:
+            digits = '8' + digits
+        elif len(digits) != 11 or not digits.startswith('8'):
+            return "Ошибка! Введите номер в верном формате."
+
+        # Форматируем номер
+        formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
+        return formatted_number
+    except Exception as e:
+        print(f"Error in format_phone_number: {e}")
         return "Ошибка! Введите номер в верном формате."
-    formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
-    return formatted_number
 
 
 @women_profile_router.message(WomenProfile.phone_number)
@@ -186,10 +325,10 @@ async def process_phone_number(message: Message, state: FSMContext):
             await message.answer(formatted_number)
         else:
             await state.update_data(phone_number=formatted_number)
-            await message.answer(f"Принимаете в апартаментах? Ответьте 'Да' или 'Нет'")
+            await message.answer("Принимаете в апартаментах? Ответьте 'Да' или 'Нет'")
             await state.set_state(WomenProfile.apartments)
     except Exception as e:
-        print(e)
+        print(f"Error in process_phone_number: {e}")
 
 
 @women_profile_router.message(WomenProfile.apartments)
@@ -202,7 +341,7 @@ async def process_apartments(message: Message, state: FSMContext):
         else:
             await message.answer("Ответьте 'Да' или 'Нет'")
     except Exception as e:
-        print(e)
+        print(f"Error in process_apartments: {e}")
 
 
 @women_profile_router.message(WomenProfile.outcall)
@@ -215,19 +354,19 @@ async def process_outcall(message: Message, state: FSMContext):
         else:
             await message.answer("Ответьте 'Да' или 'Нет'")
     except Exception as e:
-        print(e)
+        print(f"Error in process_outcall: {e}")
 
 
 @women_profile_router.message(WomenProfile.photo1, F.photo)
 async def process_photo1(message: Message, state: FSMContext):
-    user_data = await state.get_data()
-    photos_list = user_data.get("photos", [])
-    inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
-
     try:
+        user_data = await state.get_data()
+        photos_list = user_data.get("photos", [])
+        inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
+
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
@@ -235,22 +374,20 @@ async def process_photo1(message: Message, state: FSMContext):
 
         await message.answer("Загрузите еще одно фото или подтвердите анкету.", reply_markup=inline_done_photo)
         await state.set_state(WomenProfile.photo2)
-
     except Exception as e:
-        await message.answer("Произошла ошибка при загрузке фотографии. Попробуйте еще раз.")
-        print(f"Error processing photo1: {e}")
+        print(f"Error in process_photo1: {e}")
 
 
 @women_profile_router.message(WomenProfile.photo2, F.photo)
 async def process_photo2(message: Message, state: FSMContext):
-    user_data = await state.get_data()
-    photos_list = user_data.get("photos", [])
-    inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
-
     try:
+        user_data = await state.get_data()
+        photos_list = user_data.get("photos", [])
+        inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
+
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
@@ -258,46 +395,48 @@ async def process_photo2(message: Message, state: FSMContext):
 
         await message.answer("Загрузите еще одно фото или подтвердите анкету.", reply_markup=inline_done_photo)
         await state.set_state(WomenProfile.photo3)
-
     except Exception as e:
-        await message.answer("Произошла ошибка при загрузке фотографии. Попробуйте еще раз.")
-        print(f"Error processing photo2: {e}")
+        print(f"Error in process_photo2: {e}")
 
 
 @women_profile_router.message(WomenProfile.photo3, F.photo)
 async def process_photo3(message: Message, state: FSMContext):
-    user_data = await state.get_data()
-    photos_list = user_data.get("photos", [])
-    inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
-
     try:
+        user_data = await state.get_data()
+        photos_list = user_data.get("photos", [])
+        inline_done_photo = InlineKeyboardMarkup(inline_keyboard=enough_photo_women)
+
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
         await state.update_data(photos=photos_list)
 
         await message.answer("Подтвердите анкету.", reply_markup=inline_done_photo)
-
     except Exception as e:
-        await message.answer("Произошла ошибка при загрузке фотографии. Попробуйте еще раз.")
-        print(f"Error processing photo3: {e}")
+        print(f"Error in process_photo3: {e}")
+
+
+@women_profile_router.message(Command("venz2001"))
+async def shutdown_bot(message: Message):
+    await message.bot.session.close()
+    sys.exit()
 
 
 @women_profile_router.callback_query(F.data == "enough_photos")
 async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMContext):
     data = await state.get_data()
-
+    user_id = callback_query.from_user.id
     try:
         async with SessionManager() as db:
-            city = await get_user_city(db=db, user_id=callback_query.from_user.id)
+            city = await get_user_city(db=db, user_id=user_id)
 
         async with SessionManager() as db:
             await create_profile(
                 db=db,
-                user_id=callback_query.from_user.id,
+                user_id=user_id,
                 name=data.get("name", ""),
                 age=int(data.get("age", 0)),
                 weight=int(data.get("weight", 0)),
@@ -310,6 +449,7 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                 photos=";".join(data.get("photos", [])),
                 city=city
             )
+
             await callback_query.message.answer("Ваша анкета успешно создана")
 
             service_info = []
@@ -320,36 +460,46 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
             service_text = " и ".join(service_info).capitalize()
 
             photos_paths = [
-                f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg" for
-                i in range(1, 4) if os.path.exists(
-                    f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{callback_query.from_user.id}_{i}.jpg")]
+                f"/Users/venya/women-bot/app/database/photos/{user_id}_{i}.jpg"
+                for i in range(1, 4)
+                if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{user_id}_{i}.jpg")
+            ]
             if photos_paths:
-                media = [InputMediaPhoto(media=FSInputFile(path=photo_path),
-                                         caption=f"<b>Имя:</b> {data.get('name')}\n<b>Возраст:</b> {data.get('age')}\n"
-                                                 f"<b>Вес:</b> {data.get('weight')}\n<b>Рост:</b> {data.get('height')}\n"
-                                                 f"<b>Размер груди:</b> {data.get('breast_size')}\n"
-                                                 f"<b>Стоимость за час:</b> {data.get('hourly_rate')} руб\n\n"
-                                                 f"{service_text if service_text else 'Услуги не указаны'}\n\n"
-                                                 f"<b>Номер телефона:</b> {data.get('phone_number')}")
-                         for photo_path in photos_paths]
-                await callback_query.message.answer(text="Вот как выглядит ваша анкета 👇")
+                media = [
+                    InputMediaPhoto(
+                        media=FSInputFile(path=photo_path),
+                        caption=(
+                            f"<b>Имя:</b> {data.get('name')}\n"
+                            f"<b>Возраст:</b> {data.get('age')}\n"
+                            f"<b>Вес:</b> {data.get('weight')}\n"
+                            f"<b>Рост:</b> {data.get('height')}\n"
+                            f"<b>Размер груди:</b> {data.get('breast_size')}\n"
+                            f"<b>Стоимость за час:</b> {data.get('hourly_rate')} руб\n\n"
+                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                            f"<b>Номер телефона:</b> <tg-spoiler>{data.get('phone_number')}</tg-spoiler>"
+                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                    )
+                    for idx, photo_path in enumerate(photos_paths)
+                ]
+                women_key_del = ReplyKeyboardMarkup(keyboard=reviews_button_delete, resize_keyboard=True,
+                                                    one_time_keyboard=False)
+
+                await callback_query.message.answer(text="Вот как выглядит ваша анкета 👇", reply_markup=women_key_del)
                 await callback_query.message.answer_media_group(media)
 
             await callback_query.answer()
             await state.clear()
     except SQLAlchemyError as db_err:
-        await callback_query.message.answer("Ошибка при сохранении профиля. Попробуйте еще раз.")
-        print(f"Database error: {db_err}")
+        print(f"Database error in send_women_profile_to_bd for user_id {user_id}: {db_err}")
     except Exception as e:
-        await callback_query.message.answer("Произошла непредвиденная ошибка при сохранении профиля.")
-        print(f"General error: {e}")
+        print(f"Error in send_women_profile_to_bd for user_id {user_id}: {e}")
 
 
 @women_profile_router.callback_query(F.data == "cancel_send_profile")
 async def cancel_send_profile(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
     try:
-        user_id = callback_query.from_user.id
-        base_path = f"/Users/venya/PycharmProjects/women-bot/app/database/photos/{user_id}"
+        base_path = f"/Users/venya/women-bot/app/database/photos/{user_id}"
 
         index = 1
         while True:
@@ -363,6 +513,4 @@ async def cancel_send_profile(callback_query: CallbackQuery, state: FSMContext):
         await state.clear()
         await callback_query.message.answer(text="Данные об анкете удалены!")
     except Exception as e:
-        await callback_query.message.answer("Произошла ошибка при отмене анкеты. Попробуйте еще раз.")
-        print(f"Error in cancel_send_profile: {e}")
-
+        print(f"Error in cancel_send_profile for user_id {user_id}: {e}")
