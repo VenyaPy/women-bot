@@ -58,7 +58,6 @@ async def next_profile(message: Message):
         if user_id not in current_profile_index:
             current_profile_index[user_id] = 0
 
-        # Обновляем индекс профиля, чтобы он возвращался к началу при достижении конца
         current_profile_index[user_id] = (current_profile_index[user_id] + 1) % len(profiles)
         prev_next_button = await get_prev_next_button(user_id, len(profiles))
         await send_profile(message, profiles[current_profile_index[user_id]], prev_next_button)
@@ -77,7 +76,6 @@ async def prev_profile(message: Message):
         if user_id not in current_profile_index:
             current_profile_index[user_id] = 0
 
-        # Обновляем индекс профиля, чтобы он возвращался к концу при достижении начала
         current_profile_index[user_id] = (current_profile_index[user_id] - 1) % len(profiles)
         prev_next_button = await get_prev_next_button(user_id, len(profiles))
         await send_profile(message, profiles[current_profile_index[user_id]], prev_next_button)
@@ -108,11 +106,9 @@ async def send_profile(message: Message, profile, prev_next_button):
                         f"<b>Возраст:</b> {profile.age}\n"
                         f"<b>Вес:</b> {profile.weight}\n"
                         f"<b>Рост:</b> {profile.height}\n"
-                        f"<b>Размер груди:</b> {profile.breast_size}\n"
-                        f"<b>Стоимость за час:</b> {profile.hourly_rate} руб\n\n"
-                        f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                        f"<b>Размер груди:</b> {profile.breast_size}\n\n"
                         f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
-                    ) if idx == 0 else None  # Подпись только для первой фотографии
+                    ) if idx == 0 else None
                 )
                 for idx, photo_path in enumerate(photos_paths)
             ]
@@ -123,9 +119,7 @@ async def send_profile(message: Message, profile, prev_next_button):
                      f"<b>Возраст:</b> {profile.age}\n"
                      f"<b>Вес:</b> {profile.weight}\n"
                      f"<b>Рост:</b> {profile.height}\n"
-                     f"<b>Размер груди:</b> {profile.breast_size}\n"
-                     f"<b>Стоимость за час:</b> {profile.hourly_rate} руб"
-                     f"\n\n{service_text if service_text else 'Услуги не указаны'}"
+                     f"<b>Размер груди:</b> {profile.breast_size}\n\n"
                      f"\n\n<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>",
                 reply_markup=ReplyKeyboardMarkup(keyboard=prev_next_button, resize_keyboard=True, one_time_keyboard=False)
             )

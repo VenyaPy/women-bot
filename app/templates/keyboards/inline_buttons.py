@@ -36,13 +36,13 @@ city_choose = [
 
 women_subscribe = [
     [
-        InlineKeyboardButton(text="Проверка: 999р/мес", callback_data="check999")
+        InlineKeyboardButton(text="Проверка: 999р/мес", callback_data="subscribe_999_check")
     ],
     [
-        InlineKeyboardButton(text="Анкета: 1500р/мес", callback_data="questionnaire1500")
+        InlineKeyboardButton(text="Анкета: 1500р/мес", callback_data="subscribe_1500_questionnaire")
     ],
     [
-        InlineKeyboardButton(text="Акция! Проверка + Анкета: 999р/мес", callback_data="check_and_questionnaire")
+        InlineKeyboardButton(text="Акция! Проверка + Анкета: 999р/мес", callback_data="subscribe_999_check_and_questionnaire")
     ]
 ]
 

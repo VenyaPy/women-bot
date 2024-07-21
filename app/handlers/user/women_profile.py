@@ -57,9 +57,6 @@ async def show_profile(message: Message, profile):
                         f"<b>Возраст:</b> {profile.age}\n"
                         f"<b>Вес:</b> {profile.weight}\n"
                         f"<b>Рост:</b> {profile.height}\n"
-                        f"<b>Размер груди:</b> {profile.breast_size}\n"
-                        f"<b>Стоимость за час:</b> {profile.hourly_rate} руб\n\n"
-                        f"{service_text if service_text else 'Услуги не указаны'}\n\n"
                         f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
                     ) if idx == 0 else None  # Подпись только для первой фотографии
                 )
@@ -73,9 +70,7 @@ async def show_profile(message: Message, profile):
                     f"<b>Возраст:</b> {profile.age}\n"
                     f"<b>Вес:</b> {profile.weight}\n"
                     f"<b>Рост:</b> {profile.height}\n"
-                    f"<b>Размер груди:</b> {profile.breast_size}\n"
-                    f"<b>Стоимость за час:</b> {profile.hourly_rate} руб\n\n"
-                    f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                    f"<b>Размер груди:</b> {profile.breast_size}\n\n"
                     f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
                 )
             )
@@ -83,7 +78,6 @@ async def show_profile(message: Message, profile):
         print(f"Error in show_profile: {e}")
 
 
-# Хэндлер для команды "Удалить анкету"
 @women_profile_router.message(F.text == "Удалить анкету")
 async def delete_my_profile_from_bd(message: Message, state: FSMContext):
     user_id = message.from_user.id
@@ -109,7 +103,6 @@ async def delete_my_profile_from_bd(message: Message, state: FSMContext):
         print(f"Error in delete_my_profile_from_bd for user_id {user_id}: {e}")
 
 
-# Хэндлер для подтверждения удаления анкеты
 @women_profile_router.callback_query(F.data == "confirm_delete_profile")
 async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
@@ -117,6 +110,20 @@ async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContex
     try:
         async with SessionManager() as db:
             await delete_profile(db=db, user_id=user_id)
+
+        base_path = f"/Users/venya/women-bot/app/database/photos/{user_id}"
+
+        index = 1
+        while True:
+            photo_path = f"{base_path}_{index}.jpg"
+            if os.path.exists(photo_path):
+                os.remove(photo_path)
+            else:
+                break
+            index += 1
+
+        await state.clear()
+        await callback_query.message.answer(text="Данные об анкете удалены!")
 
         women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
 
@@ -190,9 +197,7 @@ async def add_women_profile(message: Message, state: FSMContext):
                             f"<b>Возраст:</b> {is_profile.age}\n"
                             f"<b>Вес:</b> {is_profile.weight}\n"
                             f"<b>Рост:</b> {is_profile.height}\n"
-                            f"<b>Размер груди:</b> {is_profile.breast_size}\n"
-                            f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n"
-                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                            f"<b>Размер груди:</b> {is_profile.breast_size}\n\n"
                             f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
                         ) if idx == 0 else None  # Подпись только для первой фотографии
                     )
@@ -208,9 +213,7 @@ async def add_women_profile(message: Message, state: FSMContext):
                         f"<b>Возраст:</b> {is_profile.age}\n"
                         f"<b>Вес:</b> {is_profile.weight}\n"
                         f"<b>Рост:</b> {is_profile.height}\n"
-                        f"<b>Размер груди:</b> {is_profile.breast_size}\n"
-                        f"<b>Стоимость за час:</b> {is_profile.hourly_rate} руб\n\n"
-                        f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                        f"<b>Размер груди:</b> {is_profile.breast_size}\n\n"
                         f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
                     ),
                     reply_markup=inline_girl_del,
@@ -263,53 +266,25 @@ async def process_height(message: Message, state: FSMContext):
     try:
         if message.text.isdigit():
             await state.update_data(height=int(message.text))
-            await message.answer("Введите размер груди, например: 2")
-            await state.set_state(WomenProfile.breast_size)
+            await message.answer("Введите номер телефона в формате: 8 *** *** ** **")
+            await state.set_state(WomenProfile.phone_number)
         else:
             await message.answer("Введите рост цифрами в см, например: 170")
     except Exception as e:
-        print(f"Error in process_height: {e}")
-
-
-@women_profile_router.message(WomenProfile.breast_size)
-async def process_breast_size(message: Message, state: FSMContext):
-    try:
-        if message.text.isdigit():
-            await state.update_data(breast_size=message.text)
-            await message.answer("Введите вашу цену за час в рублях, например: 2000")
-            await state.set_state(WomenProfile.hourly_rate)
-        else:
-            await message.answer("Введите размер груди цифрами, например: 2")
-    except Exception as e:
-        print(f"Error in process_breast_size: {e}")
-
-
-@women_profile_router.message(WomenProfile.hourly_rate)
-async def process_hourly_rate(message: Message, state: FSMContext):
-    try:
-        if message.text.isdigit():
-            await state.update_data(hourly_rate=int(message.text))
-            await message.answer("Введите ваш номер телефона в формате: 8 *** *** ** **")
-            await state.set_state(WomenProfile.phone_number)
-        else:
-            await message.answer("Введите цену за час цифрами, например: 2000")
-    except Exception as e:
-        print(f"Error in process_hourly_rate: {e}")
+        print(e)
 
 
 def format_phone_number(phone_number: str) -> str:
     try:
         digits = re.sub(r'\D', '', phone_number)
 
-        # Проверяем длину номера и корректируем его
         if len(digits) == 11 and digits.startswith('7'):
             digits = '8' + digits[1:]
-        elif len(digits) == 10:
+        elif len(digits) == 10 and not (digits.startswith('8') or digits.startswith('7')):
             digits = '8' + digits
         elif len(digits) != 11 or not digits.startswith('8'):
             return "Ошибка! Введите номер в верном формате."
 
-        # Форматируем номер
         formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
         return formatted_number
     except Exception as e:
@@ -325,36 +300,10 @@ async def process_phone_number(message: Message, state: FSMContext):
             await message.answer(formatted_number)
         else:
             await state.update_data(phone_number=formatted_number)
-            await message.answer("Принимаете в апартаментах? Ответьте 'Да' или 'Нет'")
-            await state.set_state(WomenProfile.apartments)
-    except Exception as e:
-        print(f"Error in process_phone_number: {e}")
-
-
-@women_profile_router.message(WomenProfile.apartments)
-async def process_apartments(message: Message, state: FSMContext):
-    try:
-        if message.text.lower() in ['да', 'нет']:
-            await state.update_data(apartments=message.text.lower())
-            await message.answer("Работаете ли на выезд?\n\nОтветьте 'Да' или 'Нет'")
-            await state.set_state(WomenProfile.outcall)
-        else:
-            await message.answer("Ответьте 'Да' или 'Нет'")
-    except Exception as e:
-        print(f"Error in process_apartments: {e}")
-
-
-@women_profile_router.message(WomenProfile.outcall)
-async def process_outcall(message: Message, state: FSMContext):
-    try:
-        if message.text.lower() in ['да', 'нет']:
-            await state.update_data(outcall=message.text.lower())
-            await message.answer("Пожалуйста, загрузите первое фото.")
+            await message.answer(f"Загрузите своё первое фото")
             await state.set_state(WomenProfile.photo1)
-        else:
-            await message.answer("Ответьте 'Да' или 'Нет'")
     except Exception as e:
-        print(f"Error in process_outcall: {e}")
+        print(e)
 
 
 @women_profile_router.message(WomenProfile.photo1, F.photo)
@@ -436,7 +385,7 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
         async with SessionManager() as db:
             await create_profile(
                 db=db,
-                user_id=user_id,
+                user_id=callback_query.from_user.id,
                 name=data.get("name", ""),
                 age=int(data.get("age", 0)),
                 weight=int(data.get("weight", 0)),
@@ -473,12 +422,10 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                             f"<b>Возраст:</b> {data.get('age')}\n"
                             f"<b>Вес:</b> {data.get('weight')}\n"
                             f"<b>Рост:</b> {data.get('height')}\n"
-                            f"<b>Размер груди:</b> {data.get('breast_size')}\n"
-                            f"<b>Стоимость за час:</b> {data.get('hourly_rate')} руб\n\n"
-                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
                             f"<b>Номер телефона:</b> <tg-spoiler>{data.get('phone_number')}</tg-spoiler>"
                         ) if idx == 0 else None  # Подпись только для первой фотографии
                     )
+
                     for idx, photo_path in enumerate(photos_paths)
                 ]
                 women_key_del = ReplyKeyboardMarkup(keyboard=reviews_button_delete, resize_keyboard=True,

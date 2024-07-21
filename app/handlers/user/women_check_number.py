@@ -47,15 +47,13 @@ def format_phone_number(phone_number: str) -> str:
     try:
         digits = re.sub(r'\D', '', phone_number)
 
-        # Проверяем длину номера и корректируем его
         if len(digits) == 11 and digits.startswith('7'):
             digits = '8' + digits[1:]
-        elif len(digits) == 10:
+        elif len(digits) == 10 and not (digits.startswith('8') or digits.startswith('7')):
             digits = '8' + digits
         elif len(digits) != 11 or not digits.startswith('8'):
             return "Ошибка! Введите номер в верном формате."
 
-        # Форматируем номер
         formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
         return formatted_number
     except Exception as e:
@@ -65,9 +63,8 @@ def format_phone_number(phone_number: str) -> str:
 
 async def schedule_review_request(bot: Bot, chat_id: int, phone_number: str):
     try:
-        await asyncio.sleep(60)
+        await asyncio.sleep(10800)
 
-        # Убираем пробелы из номера телефона
         formatted_phone_number = phone_number.replace(" ", "")
 
         add_or_not_add_review = [

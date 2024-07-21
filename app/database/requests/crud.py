@@ -68,7 +68,7 @@ async def add_or_update_user(user_id: int, gender: str, db: AsyncSession):
         print(f"Ошибка в функции add_or_update_user: {e}")
 
 
-async def update_user_subscription(db: AsyncSession, user_id: int, subscription_status: str, subscription_type: str, subscription_end_date: datetime, rebill_id: str, payment_id: str):
+async def update_user_subscription(db: AsyncSession, user_id: int, subscription_status: str, subscription_type: str, subscription_end_date: datetime):
     try:
         async with db.begin():
             result = await db.execute(select(User).filter(User.user_id == user_id))
@@ -77,8 +77,6 @@ async def update_user_subscription(db: AsyncSession, user_id: int, subscription_
                 user.subscription_status = subscription_status
                 user.subscription_type = subscription_type
                 user.subscription_end_date = subscription_end_date.replace(microsecond=0)
-                user.rebill_id = rebill_id
-                user.payment_id = payment_id
                 user.updated_at = datetime.now()
                 db.add(user)
                 await db.commit()

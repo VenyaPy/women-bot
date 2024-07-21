@@ -34,6 +34,8 @@ class Review(StatesGroup):
 
 @women_review_router.callback_query(F.data.startswith("want_to_add_review_"))
 async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
+    user_id = callback_query.from_user.id
+
     try:
         user_id = callback_query.from_user.id
         phone_number = callback_query.data[len("want_to_add_review_"):]
@@ -61,6 +63,8 @@ async def add_review_callback(callback_query: CallbackQuery, state: FSMContext):
 
 @women_review_router.message(F.text == "Добавить отзыв")
 async def add_review(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+
     try:
         user_id = message.from_user.id
         async with SessionManager() as db:
@@ -111,19 +115,17 @@ def format_phone_number(phone_number: str) -> str:
     try:
         digits = re.sub(r'\D', '', phone_number)
 
-        # Проверяем длину номера и корректируем его
         if len(digits) == 11 and digits.startswith('7'):
             digits = '8' + digits[1:]
-        elif len(digits) == 10:
+        elif len(digits) == 10 and not (digits.startswith('8') or digits.startswith('7')):
             digits = '8' + digits
         elif len(digits) != 11 or not digits.startswith('8'):
             return "Ошибка! Введите номер в верном формате."
 
-        # Форматируем номер
         formatted_number = f'{digits[0]} {digits[1:4]} {digits[4:7]} {digits[7:9]} {digits[9:]}'
         return formatted_number
     except Exception as e:
-        print(f"Ошибка в format_phone_number: {e}")
+        print(f"Error in format_phone_number: {e}")
         return "Ошибка! Введите номер в верном формате."
 
 
@@ -157,6 +159,8 @@ async def add_text(message: Message, state: FSMContext):
 
 @women_review_router.callback_query(F.data == 'send_review_to_bd')
 async def send_done_review(callback: CallbackQuery, state: FSMContext):
+    user_id = callback.from_user.id
+
     try:
         data = await state.get_data()
         user_id = callback.message.from_user.id

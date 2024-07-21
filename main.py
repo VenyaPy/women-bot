@@ -9,7 +9,7 @@ from app.handlers.admin.admin_cancel import admin_cancel_router
 from app.handlers.admin.admin_mailing import admin_mailing_router
 from app.handlers.admin.admin_start import admin_router
 from app.handlers.user.men_menu import men_router
-from app.handlers.user.tinkoff_user_pay import tinkoff_router, check_subscriptions
+from app.handlers.user.tinkoff_user_pay import tinkoff_router, schedule_daily_subscription_check
 from config import TOKEN_BOT
 from aiogram.client.default import DefaultBotProperties
 from app.handlers.user.start import start_router
@@ -37,10 +37,8 @@ dp.include_routers(start_router,
 
 
 async def main() -> None:
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(check_subscriptions, 'interval', seconds=21600)  # Проверка каждые 10 секунд
-    scheduler.start()
     await dp.start_polling(bot)
+    await schedule_daily_subscription_check()
 
 
 if __name__ == "__main__":

@@ -31,9 +31,9 @@ class SessionManager:
 async def confirm_subscribe(message: Message):
     try:
         await message.answer(
-            "Даю согласие на "
-            "<a href='https://telegra.ph/Soglasie-na-obrabotku-personalnyh-dannyh-06-12'>Обработку персональных данных</a> и "
-            "<a href='https://telegra.ph/Soglasie-na-sohranenie-uchetnyh-dанных-для-будущих-транзакций-06-12'>Согласие на сохранение учетных данных для будущих транзакций</a>",
+            "Соглашаюсь с "
+            "<a href='https://telegra.ph/Politika-konfidencialnosti-06-12-11'>Политикой конфиденциальности</a>, "
+            "<a href='https://telegra.ph/Oferta-06-12-2'>Офертой</a> и <a href='https://telegra.ph/Oferta-rekurentnyh-platezhej-06-12'>Офертой рекуррентных платежей</a>",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Да", callback_data="user_agree")],
                 [InlineKeyboardButton(text="Нет", callback_data="user_disagree")]
@@ -73,7 +73,9 @@ async def user_agree(callback_query: CallbackQuery):
 
     try:
         if is_user and is_user.gender == "Мужчина":
-            keyboard = ReplyKeyboardMarkup(keyboard=prev_next_button, resize_keyboard=True, one_time_keyboard=False)
+            keyboard = ReplyKeyboardMarkup(keyboard=prev_next_button,
+                                           resize_keyboard=True,
+                                           one_time_keyboard=False)
 
             try:
                 async with SessionManager() as db:
@@ -109,9 +111,7 @@ async def user_agree(callback_query: CallbackQuery):
                             f"<b>Возраст:</b> {random_profile.age}\n"
                             f"<b>Вес:</b> {random_profile.weight}\n"
                             f"<b>Рост:</b> {random_profile.height}\n"
-                            f"<b>Размер груди:</b> {random_profile.breast_size}\n"
-                            f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб\n\n"
-                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                            f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
                             f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>"
                         ) if idx == 0 else None  # Подпись только для первой фотографии
                     )
@@ -134,9 +134,7 @@ async def user_agree(callback_query: CallbackQuery):
                              f"<b>Возраст:</b> {random_profile.age}\n"
                              f"<b>Вес:</b> {random_profile.weight}\n"
                              f"<b>Рост:</b> {random_profile.height}\n"
-                             f"<b>Размер груди:</b> {random_profile.breast_size}\n"
-                             f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб"
-                             f"\n\n{service_text if service_text else 'Услуги не указаны'}"
+                             f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
                              f"\n\n<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
                         reply_markup=keyboard
                     )
@@ -248,7 +246,9 @@ async def process_city_selection(callback_query: CallbackQuery):
 
         elif gender == 'Мужчина':
             await callback_query.message.delete()
-            keyboard = ReplyKeyboardMarkup(keyboard=prev_next_button, resize_keyboard=True, one_time_keyboard=False)
+            keyboard_mens = ReplyKeyboardMarkup(keyboard=prev_next_button,
+                                                resize_keyboard=True,
+                                                one_time_keyboard=False)
 
             try:
                 async with SessionManager() as db:
@@ -284,18 +284,18 @@ async def process_city_selection(callback_query: CallbackQuery):
                             f"<b>Возраст:</b> {random_profile.age}\n"
                             f"<b>Вес:</b> {random_profile.weight}\n"
                             f"<b>Рост:</b> {random_profile.height}\n"
-                            f"<b>Размер груди:</b> {random_profile.breast_size}\n"
-                            f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб\n\n"
-                            f"{service_text if service_text else 'Услуги не указаны'}\n\n"
+                            f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
                             f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>"
-                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                        ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
                 ]
 
                 try:
                     await callback_query.message.answer_media_group(media)
-                    await callback_query.message.answer(text="Подсказка! Вы можете использовать стрелки на клавиатуре для переключения между анкетами.", reply_markup=keyboard)
+                    await callback_query.message.answer(text="Подсказка! Вы можете использовать стрелки "
+                                                             "на клавиатуре для переключения между анкетами.",
+                                                        reply_markup=keyboard_mens)
                 except Exception as e:
                     print(f"Ошибка при отправке медиагруппы или сообщения: {e}")
             else:
@@ -305,11 +305,9 @@ async def process_city_selection(callback_query: CallbackQuery):
                              f"<b>Возраст:</b> {random_profile.age}\n"
                              f"<b>Вес:</b> {random_profile.weight}\n"
                              f"<b>Рост:</b> {random_profile.height}\n"
-                             f"<b>Размер груди:</b> {random_profile.breast_size}\n"
-                             f"<b>Стоимость за час:</b> {random_profile.hourly_rate} руб"
-                             f"\n\n{service_text if service_text else 'Услуги не указаны'}"
+                             f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
                              f"\n\n<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
-                        reply_markup=keyboard
+                        reply_markup=keyboard_mens
                     )
                 except Exception as e:
                     print(f"Ошибка при отправке сообщения о профиле: {e}")
