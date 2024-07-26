@@ -1,5 +1,6 @@
 from aiogram.types import KeyboardButton
 
+
 prev_next_button = [
     [
         KeyboardButton(text="<<<"),
@@ -47,9 +48,6 @@ reviews_button_cancel = [
     ],
     [
         KeyboardButton(text="Помощь")
-    ],
-    [
-        KeyboardButton(text="Отменить подписку")
     ]
 ]
 

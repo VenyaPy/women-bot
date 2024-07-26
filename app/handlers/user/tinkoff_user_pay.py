@@ -30,7 +30,7 @@ async def check_payment(user_id):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params=params, ssl=False) as response:  # Отключаем проверку SSL
+            async with session.get(url, params=params, ssl=False) as response:
                 if response.status == 200:
                     data = await response.json()
                     for transaction in data:
@@ -41,7 +41,6 @@ async def check_payment(user_id):
     return False
 
 
-# Хранилище для текущих задач проверки платежей
 current_payment_tasks = {}
 
 
@@ -63,9 +62,10 @@ async def periodic_payment_check(user_id, subscription_type, callback_query: Cal
                         user_id=user_id,
                         subscription_status="True",
                         subscription_type=subscription_type,
-                        subscription_end_date=datetime.now() + timedelta(days=30)  # Пример для месячной подписки
+                        subscription_end_date=datetime.now() + timedelta(days=30)
                     )
-                await callback_query.message.answer(text="Подписка успешно оплачена")
+                await callback_query.message.answer(text="Подписка успешно оформлена.\n\n"
+                                                         "Присоединяйтесь в наш чат https://t.me/eskort555")
                 break
             await asyncio.sleep(10)
     except asyncio.CancelledError:
@@ -76,7 +76,6 @@ async def periodic_payment_check(user_id, subscription_type, callback_query: Cal
 async def process_subscription(callback_query: CallbackQuery):
     try:
         await callback_query.message.delete()
-        # Определение типа подписки и суммы
         subscription_map = {
             "subscribe_999_check": (999, "Проверка"),
             "subscribe_1500_questionnaire": (1500, "Анкета"),
@@ -150,7 +149,6 @@ async def daily_subscription_check():
                         account_id = model.get('AccountId')
                         status = model.get('Status')
 
-                        # Проверяем нужные статусы подписки и обновляем базу данных
                         if status in ['Cancelled', 'Rejected', 'Expired']:
                             updated = await update_subscription_in_db(account_id)
                             if updated:
@@ -166,7 +164,6 @@ async def daily_subscription_check():
 async def schedule_daily_subscription_check():
     while True:
         await daily_subscription_check()
-        # Проверка каждые 24 часа
         await asyncio.sleep(24 * 60 * 60)
 
 

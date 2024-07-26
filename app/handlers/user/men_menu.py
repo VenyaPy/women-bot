@@ -93,9 +93,9 @@ async def send_profile(message: Message, profile, prev_next_button):
         service_text = " и ".join(service_info).capitalize()
 
         photos_paths = [
-            f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
+            f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
             for i in range(1, 4)
-            if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
+            if os.path.exists(f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
         ]
         if photos_paths:
             media = [

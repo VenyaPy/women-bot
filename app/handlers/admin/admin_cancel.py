@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 
 from aiogram import F, Router
@@ -6,7 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery
 from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_users_with_active_subscription, get_female_users, get_male_users, \
-    get_all_user_ids, get_user_info, delete_user_subscription_details
+    get_all_user_ids, get_user_info, delete_user_subscription_details, delete_profile
 from app.filters.chat_types import IsAdmin
 from app.templates.keyboards.inline_buttons import users_of_mailing, is_check_post, send_or_delete_mail
 
@@ -21,7 +22,6 @@ class SessionManager:
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.db.close()
-
 
 
 class CancelSubscriptionForm(StatesGroup):
@@ -52,16 +52,31 @@ async def process_user_id(message: Message, state: FSMContext):
     try:
         async with SessionManager() as db:
             user_info = await get_user_info(db, user_id)
+
+        async with SessionManager() as db:
+            await delete_profile(db=db, user_id=user_id)
+
             if user_info:
-                user = delete_user_subscription_details(db, user_id)
+                user = await delete_user_subscription_details(db, user_id)
+
+                base_path = f"/home/women-bot/app/database/photos/{user_id}"
+                index = 1
+
+                while True:
+                    photo_path = f"{base_path}_{index}.jpg"
+                    if os.path.exists(photo_path):
+                        os.remove(photo_path)
+                    else:
+                        break
+                    index += 1
+
                 if user:
-                    await message.answer(f"Подписка для пользователя с ID {user_id} успешно отключена.\n\n"
-                                         f"customer_key: {user_info.customer_key}\n"
-                                         f"payment_id: {user_info.payment_id}")
+                    await message.answer(f"Подписка для пользователя с ID {user_id} успешно отключена, анкета удалена!")
                 else:
                     await message.answer(f"Пользователь с ID {user_id} не найден.")
             else:
                 await message.answer(f"Пользователь с ID {user_id} не найден.")
+
     except Exception as e:
         await message.answer(f"Произошла ошибка: {e}")
     finally:

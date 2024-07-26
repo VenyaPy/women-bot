@@ -7,7 +7,7 @@ from aiogram.types import (
     CallbackQuery, InlineKeyboardButton
 )
 
-from app.database.models.users import AsyncSession, async_session_maker
+from app.database.models.users import async_session_maker
 from app.database.requests.crud import get_users_with_active_subscription, get_female_users, get_male_users, \
     get_all_user_ids
 from app.filters.chat_types import IsAdmin

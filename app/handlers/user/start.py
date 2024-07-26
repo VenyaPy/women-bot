@@ -32,8 +32,8 @@ async def confirm_subscribe(message: Message):
     try:
         await message.answer(
             "Соглашаюсь с "
-            "<a href='https://telegra.ph/Politika-konfidencialnosti-06-12-11'>Политикой конфиденциальности</a>, "
-            "<a href='https://telegra.ph/Oferta-06-12-2'>Офертой</a> и <a href='https://telegra.ph/Oferta-rekurentnyh-platezhej-06-12'>Офертой рекуррентных платежей</a>",
+            "<a href='https://telegra.ph/Politika-konfidencialnosti-06-12-11'>Политикой конфиденциальности</a> и "
+            "<a href='https://telegra.ph/Oferta-06-12-2'>Офертой</a>.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="Да", callback_data="user_agree")],
                 [InlineKeyboardButton(text="Нет", callback_data="user_disagree")]
@@ -101,7 +101,7 @@ async def user_agree(callback_query: CallbackQuery):
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
             if photos_paths:
                 media = [
                     InputMediaPhoto(
@@ -274,7 +274,7 @@ async def process_city_selection(callback_query: CallbackQuery):
                 service_info.append("Работаю на выезд")
             service_text = " и ".join(service_info).capitalize()
 
-            photos_paths = [f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
             if photos_paths:
                 media = [
                     InputMediaPhoto(

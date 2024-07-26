@@ -44,9 +44,9 @@ async def show_profile(message: Message, profile):
         service_text = " и ".join(service_info).capitalize()
 
         photos_paths = [
-            f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
+            f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
             for i in range(1, 4)
-            if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
+            if os.path.exists(f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
         ]
         if photos_paths:
             media = [
@@ -111,7 +111,7 @@ async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContex
         async with SessionManager() as db:
             await delete_profile(db=db, user_id=user_id)
 
-        base_path = f"/Users/venya/women-bot/app/database/photos/{user_id}"
+        base_path = f"/home/women-bot/app/database/photos/{user_id}"
 
         index = 1
         while True:
@@ -134,7 +134,6 @@ async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContex
         print(f"Error in confirm_delete_profile for user_id {user_id}: {e}")
 
 
-# Хэндлер для отмены удаления анкеты
 @women_profile_router.callback_query(F.data == "cancel_delete_profile")
 async def cancel_delete_profile(callback_query: CallbackQuery, state: FSMContext):
     try:
@@ -150,9 +149,6 @@ class WomenProfile(StatesGroup):
     weight = State()
     height = State()
     breast_size = State()
-    hourly_rate = State()
-    apartments = State()
-    outcall = State()
     photo1 = State()
     photo2 = State()
     photo3 = State()
@@ -184,9 +180,9 @@ async def add_women_profile(message: Message, state: FSMContext):
             service_text = " и ".join(service_info).capitalize()
 
             photos_paths = [
-                f"/Users/venya/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg"
+                f"/home/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg"
                 for i in range(1, 4)
-                if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")
+                if os.path.exists(f"/home/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")
             ]
             if photos_paths:
                 media = [
@@ -199,7 +195,7 @@ async def add_women_profile(message: Message, state: FSMContext):
                             f"<b>Рост:</b> {is_profile.height}\n"
                             f"<b>Размер груди:</b> {is_profile.breast_size}\n\n"
                             f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
-                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                        ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
                 ]
@@ -266,12 +262,26 @@ async def process_height(message: Message, state: FSMContext):
     try:
         if message.text.isdigit():
             await state.update_data(height=int(message.text))
-            await message.answer("Введите номер телефона в формате: 8 *** *** ** **")
-            await state.set_state(WomenProfile.phone_number)
+            await message.answer("Введите размер груди цифрой, например: 4")
+            await state.set_state(WomenProfile.breast_size)
         else:
             await message.answer("Введите рост цифрами в см, например: 170")
     except Exception as e:
         print(e)
+
+
+@women_profile_router.message(WomenProfile.breast_size)
+async def process_breast_size(message: Message, state: FSMContext):
+    try:
+        if message.text.isdigit():
+            await state.update_data(breast_size=int(message.text))
+            await message.answer("Введите номер телефона в формате: 8 *** *** ** **")
+            await state.set_state(WomenProfile.phone_number)
+        else:
+            await message.answer("Введите размер груди цифрой, например: 4")
+    except Exception as e:
+        print(e)
+
 
 
 def format_phone_number(phone_number: str) -> str:
@@ -315,7 +325,7 @@ async def process_photo1(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
@@ -336,7 +346,7 @@ async def process_photo2(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
@@ -357,7 +367,7 @@ async def process_photo3(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/Users/venya/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
         await message.bot.download(file=photo_file_id, destination=file_path)
         photos_list.append(file_path)
 
@@ -390,8 +400,7 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                 age=int(data.get("age", 0)),
                 weight=int(data.get("weight", 0)),
                 height=int(data.get("height", 0)),
-                breast_size=data.get("breast_size", ""),
-                hourly_rate=int(data.get("hourly_rate", 0)),
+                breast_size=str(data.get("breast_size", 0)),  # Изменение здесь
                 phone_number=data.get("phone_number", ""),
                 apartments=data.get("apartments", "").lower() == "да",
                 outcall=data.get("outcall", "").lower() == "да",
@@ -409,9 +418,9 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
             service_text = " и ".join(service_info).capitalize()
 
             photos_paths = [
-                f"/Users/venya/women-bot/app/database/photos/{user_id}_{i}.jpg"
+                f"/home/women-bot/app/database/photos/{user_id}_{i}.jpg"
                 for i in range(1, 4)
-                if os.path.exists(f"/Users/venya/women-bot/app/database/photos/{user_id}_{i}.jpg")
+                if os.path.exists(f"/home/women-bot/app/database/photos/{user_id}_{i}.jpg")
             ]
             if photos_paths:
                 media = [
@@ -422,10 +431,10 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                             f"<b>Возраст:</b> {data.get('age')}\n"
                             f"<b>Вес:</b> {data.get('weight')}\n"
                             f"<b>Рост:</b> {data.get('height')}\n"
+                            f"<b>Размер груди:</b> {data.get('breast_size')}\n\n"  # Изменение здесь
                             f"<b>Номер телефона:</b> <tg-spoiler>{data.get('phone_number')}</tg-spoiler>"
                         ) if idx == 0 else None  # Подпись только для первой фотографии
                     )
-
                     for idx, photo_path in enumerate(photos_paths)
                 ]
                 women_key_del = ReplyKeyboardMarkup(keyboard=reviews_button_delete, resize_keyboard=True,
@@ -446,7 +455,7 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
 async def cancel_send_profile(callback_query: CallbackQuery, state: FSMContext):
     user_id = callback_query.from_user.id
     try:
-        base_path = f"/Users/venya/women-bot/app/database/photos/{user_id}"
+        base_path = f"/home/women-bot/app/database/photos/{user_id}"
 
         index = 1
         while True:
