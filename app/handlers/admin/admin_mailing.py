@@ -1,6 +1,7 @@
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.state import (State,
+                               StatesGroup)
 from aiogram.types import (
     Message,
     InlineKeyboardMarkup,
@@ -8,10 +9,14 @@ from aiogram.types import (
 )
 
 from app.database.models.users import async_session_maker
-from app.database.requests.crud import get_users_with_active_subscription, get_female_users, get_male_users, \
-    get_all_user_ids
+from app.database.requests.crud import (get_users_with_active_subscription,
+                                        get_female_users,
+                                        get_male_users,
+                                        get_all_user_ids)
 from app.filters.chat_types import IsAdmin
-from app.templates.keyboards.inline_buttons import users_of_mailing, is_check_post, send_or_delete_mail
+from app.templates.keyboards.inline_buttons import (users_of_mailing,
+                                                    is_check_post,
+                                                    send_or_delete_mail)
 
 
 class SessionManager:
@@ -33,10 +38,15 @@ admin_mailing_router.callback_query.filter(IsAdmin())
 
 @admin_mailing_router.message(F.text.lower() == "рассылка")
 async def newsletter_menu(message: Message, state: FSMContext):
+    """
+    Функция рассылки для пользователей
+    """
     try:
         await state.clear()
         reply = InlineKeyboardMarkup(inline_keyboard=users_of_mailing)
-        await message.answer(text="<b>📨 Меню постинга</b>\n\nТы можешь сделать рассылку пользователям 👇", reply_markup=reply)
+        await message.answer(text="<b>📨 Меню постинга</b>\n\n"
+                                  "Ты можешь сделать рассылку пользователям 👇",
+                             reply_markup=reply)
     except Exception as e:
         print(f"Ошибка в newsletter_menu: {e}")
 
@@ -48,8 +58,14 @@ class Form(StatesGroup):
     send_post = State()
 
 
-@admin_mailing_router.callback_query(F.data.in_({"send_to_all", "send_mail_to_mens", "send_mail_to_women", "send_mail_to_subscribers"}))
+@admin_mailing_router.callback_query(F.data.in_({"send_to_all",
+                                                 "send_mail_to_mens",
+                                                 "send_mail_to_women",
+                                                 "send_mail_to_subscribers"}))
 async def select_recipients(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    Ожидание текста для рассылки
+    """
     try:
         await callback.message.delete()
         await state.update_data(recipient_category=callback.data)
@@ -61,20 +77,30 @@ async def select_recipients(callback: CallbackQuery, state: FSMContext) -> None:
 
 @admin_mailing_router.message(Form.add_text)
 async def process_text(message: Message, state: FSMContext) -> None:
+    """
+    Сохранение текста, либо добавление медиа
+    """
     try:
-        await state.update_data(add_text=message.html_text, add_entities=message.entities)
+        await state.update_data(add_text=message.html_text,
+                                add_entities=message.entities)
         await state.set_state(Form.ask_add_media)
         inline_add_media = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Добавить фото или видео", callback_data="add_media")],
-            [InlineKeyboardButton(text="Не добавлять", callback_data="no_media")]
+            [InlineKeyboardButton(text="Добавить фото или видео",
+                                  callback_data="add_media")],
+            [InlineKeyboardButton(text="Не добавлять",
+                                  callback_data="no_media")]
         ])
-        await message.answer("Хотите добавить фото или видео?", reply_markup=inline_add_media)
+        await message.answer("Хотите добавить фото или видео?",
+                             reply_markup=inline_add_media)
     except Exception as e:
         print(f"Ошибка в process_text: {e}")
 
 
 @admin_mailing_router.callback_query(Form.ask_add_media, F.data == "add_media")
 async def ask_add_media(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    При добавлении медиа сохраняем его
+    """
     try:
         await callback.message.delete()
         await state.set_state(Form.add_photo)
@@ -85,6 +111,9 @@ async def ask_add_media(callback: CallbackQuery, state: FSMContext) -> None:
 
 @admin_mailing_router.callback_query(Form.ask_add_media, F.data == "no_media")
 async def no_add_media(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    Отмена медиа и перевод на отправку
+    """
     try:
         await callback.message.delete()
         data = await state.get_data()
@@ -95,6 +124,9 @@ async def no_add_media(callback: CallbackQuery, state: FSMContext) -> None:
 
 @admin_mailing_router.message(Form.add_photo)
 async def process_photo(message: Message, state: FSMContext) -> None:
+    """
+    Функция для добавления фото или видео
+    """
     try:
         inline_results = InlineKeyboardMarkup(inline_keyboard=is_check_post)
 
@@ -108,14 +140,19 @@ async def process_photo(message: Message, state: FSMContext) -> None:
             await message.answer("Пожалуйста, отправьте фото или видео.")
             return
 
-        await state.update_data(add_media=media_file_id, media_type=media_type)
-        await message.answer('Пост готов!', reply_markup=inline_results)
+        await state.update_data(add_media=media_file_id,
+                                media_type=media_type)
+        await message.answer('Пост готов!',
+                             reply_markup=inline_results)
     except Exception as e:
         print(f"Ошибка в process_photo: {e}")
 
 
 @admin_mailing_router.callback_query(F.data == "check_mailing_result")
 async def finish_post_creation(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    Просмотр готового поста перед отправкой
+    """
     try:
         data = await state.get_data()
         add_text = data.get("add_text", "")
@@ -125,14 +162,19 @@ async def finish_post_creation(callback: CallbackQuery, state: FSMContext) -> No
 
         if media_type:
             if media_type == 'photo':
-                await callback.message.answer_photo(photo=add_media, caption=add_text, caption_entities=entities)
+                await callback.message.answer_photo(photo=add_media,
+                                                    caption=add_text,
+                                                    caption_entities=entities)
             elif media_type == 'video':
-                await callback.message.answer_video(video=add_media, caption=add_text, caption_entities=entities)
+                await callback.message.answer_video(video=add_media,
+                                                    caption=add_text,
+                                                    caption_entities=entities)
         else:
             await callback.message.answer(text=add_text, entities=entities)
 
         done_b = InlineKeyboardMarkup(inline_keyboard=send_or_delete_mail)
-        await callback.message.answer(text="Что делаем с постом?", reply_markup=done_b)
+        await callback.message.answer(text="Что делаем с постом?",
+                                      reply_markup=done_b)
         await state.set_state(Form.send_post)
     except Exception as e:
         print(f"Ошибка в finish_post_creation: {e}")
@@ -140,6 +182,9 @@ async def finish_post_creation(callback: CallbackQuery, state: FSMContext) -> No
 
 @admin_mailing_router.callback_query(F.data == 'delete_mail')
 async def cancel_handler(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    Отмена отправки и очистка состояния
+    """
     try:
         current_state = await state.get_state()
         if current_state is None:
@@ -152,6 +197,9 @@ async def cancel_handler(callback: CallbackQuery, state: FSMContext) -> None:
 
 @admin_mailing_router.callback_query(F.data == 'send_mail')
 async def send_post(callback: CallbackQuery, state: FSMContext) -> None:
+    """
+    Отправка поста определенной группе пользователей
+    """
     try:
         data = await state.get_data()
         add_text = data.get("add_text", "")
@@ -163,13 +211,13 @@ async def send_post(callback: CallbackQuery, state: FSMContext) -> None:
         user_ids = []
 
         async with SessionManager() as db:
-            if recipient_category == "send_to_all":
+            if recipient_category == "send_to_all":  # Отправка поста всем пользователей
                 user_ids = await get_all_user_ids(db)
-            elif recipient_category == "send_mail_to_mens":
+            elif recipient_category == "send_mail_to_mens":  # Отправка поста всем мужчинам
                 user_ids = [user.user_id for user in await get_male_users(db)]
-            elif recipient_category == "send_mail_to_women":
+            elif recipient_category == "send_mail_to_women":  # Отправка поста женщинам без подписки
                 user_ids = [user.user_id for user in await get_female_users(db)]
-            elif recipient_category == "send_mail_to_subscribers":
+            elif recipient_category == "send_mail_to_subscribers":  # Отправка поста женщинам с подпиской
                 user_ids = [user.user_id for user in await get_users_with_active_subscription(db)]
 
         successful_sends = 0
@@ -178,17 +226,27 @@ async def send_post(callback: CallbackQuery, state: FSMContext) -> None:
         for user_id in user_ids:
             try:
                 if media_type == 'photo':
-                    await callback.bot.send_photo(chat_id=user_id, photo=add_media, caption=add_text, caption_entities=entities)
+                    await callback.bot.send_photo(chat_id=user_id,
+                                                  photo=add_media,
+                                                  caption=add_text,
+                                                  caption_entities=entities)
                 elif media_type == 'video':
-                    await callback.bot.send_video(chat_id=user_id, video=add_media, caption=add_text, caption_entities=entities)
+                    await callback.bot.send_video(chat_id=user_id,
+                                                  video=add_media,
+                                                  caption=add_text,
+                                                  caption_entities=entities)
                 else:
-                    await callback.bot.send_message(chat_id=user_id, text=add_text, entities=entities)
+                    await callback.bot.send_message(chat_id=user_id,
+                                                    text=add_text,
+                                                    entities=entities)
                 successful_sends += 1
             except Exception as e:
                 print(f"Не удалось отправить пост пользователю {user_id}: {e}")
                 failed_sends += 1
 
-        await callback.message.answer(f"Рассылка завершена. Успешно: {successful_sends}, Неудачно: {failed_sends}")
+        await callback.message.answer(f"Рассылка завершена. "
+                                      f"Успешно: {successful_sends}, "
+                                      f"Неудачно: {failed_sends}")
     except Exception as e:
         print(f"Ошибка в send_post: {e}")
     finally:

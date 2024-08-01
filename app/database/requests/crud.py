@@ -2,6 +2,7 @@ import random
 import string
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database.models.users import User, Profile, Review
@@ -16,6 +17,42 @@ async def get_all_user_ids(db: AsyncSession):
         print(f"Ошибка при получении id всех юзеров: {e}")
 
 
+async def count_male_users(db: AsyncSession):
+    try:
+        result = await db.execute(select(func.count()).filter(
+            User.gender == "Мужчина"
+        ))
+        count = result.scalar()
+        return count
+    except Exception as e:
+        print(f"Ошибка в функции count_male_users: {e}")
+
+
+async def count_female_users_with_no_subscription(db: AsyncSession):
+    try:
+        result = await db.execute(select(func.count()).filter(
+            (User.gender == "Женщина") & (User.subscription_type == "None")
+        ))
+        count = result.scalar()
+        return count
+    except Exception as e:
+        print(f"Ошибка в функции count_female_users_with_no_subscription: {e}")
+
+
+async def get_count_profiles(db: AsyncSession, city: str) -> int:
+    try:
+        stmt = select(func.count(Profile.id)).where(Profile.city == city)
+
+        # Выполняем запрос и получаем результат
+        result = await db.execute(stmt)
+        count = result.scalar()  # Получаем единственное значение
+
+        return count
+    except Exception as e:
+        print(f"Ошибка при выполнении запроса: {e}")
+        return 0
+
+
 async def get_male_users(db: AsyncSession):
     try:
         result = await db.execute(select(User).filter(User.gender == "Мужчина"))
@@ -27,11 +64,14 @@ async def get_male_users(db: AsyncSession):
 
 async def get_female_users(db: AsyncSession):
     try:
-        result = await db.execute(select(User).filter(User.subscription_type == "None"))
-        active_users = result.scalars().all()
-        return active_users
+        result = await db.execute(select(User).filter(
+            (User.gender == "Женщина") & (User.subscription_type == "None")
+        ))
+        female_users = result.scalars().all()
+        return female_users
     except Exception as e:
         print(f"Ошибка в функции get_female_users: {e}")
+
 
 
 async def get_users_with_active_subscription(db: AsyncSession):

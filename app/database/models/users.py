@@ -5,13 +5,20 @@ from datetime import datetime
 import os
 
 
-# Создаем URL для подключения к базе данных
-DATABASE_URL = f"sqlite+aiosqlite:///app/database/women_bot.db"
+base_dir = '/home/backup'
+
+# Определите имя файла базы данных
+db_file = 'women_bot.db'
+
+# Создайте полный путь к файлу базы данных
+db_path = os.path.join(base_dir, db_file)
+
+# Формируйте URL подключения
+DATABASE_URL = f"sqlite+aiosqlite:///{db_path}"
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 Base = declarative_base()
-
 
 
 class User(Base):

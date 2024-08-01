@@ -1,15 +1,13 @@
 import asyncio
-from aiogram import Bot, Dispatcher, F
+from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
-from aiogram.types import Message
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.handlers.admin.admin_cancel import admin_cancel_router
 from app.handlers.admin.admin_mailing import admin_mailing_router
 from app.handlers.admin.admin_start import admin_router
 from app.handlers.user.men_menu import men_router
-from app.handlers.user.tinkoff_user_pay import tinkoff_router, schedule_daily_subscription_check
+from app.handlers.user.tinkoff_user_pay import (tinkoff_router,
+                                                schedule_daily_subscription_check)
 from config import TOKEN_BOT
 from aiogram.client.default import DefaultBotProperties
 from app.handlers.user.start import start_router
@@ -17,6 +15,7 @@ from app.handlers.user.women_help import women_router
 from app.handlers.user.women_review import women_review_router
 from app.handlers.user.women_check_number import women_check_router
 from app.handlers.user.women_profile import women_profile_router
+from app.handlers.admin.admin_stat import admin_stat
 
 
 TOKEN = TOKEN_BOT
@@ -33,7 +32,8 @@ dp.include_routers(start_router,
                    admin_router,
                    admin_mailing_router,
                    tinkoff_router,
-                   admin_cancel_router)
+                   admin_cancel_router,
+                   admin_stat)
 
 
 async def main() -> None:

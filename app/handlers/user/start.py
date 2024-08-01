@@ -2,14 +2,34 @@ import os
 import random
 from aiogram import Router, F, types
 from aiogram.filters import CommandStart
-from aiogram.types import Message, InlineKeyboardMarkup, CallbackQuery, ReplyKeyboardMarkup, InputMediaPhoto, FSInputFile, InlineKeyboardButton
+from aiogram.types import (Message,
+                           InlineKeyboardMarkup,
+                           CallbackQuery,
+                           ReplyKeyboardMarkup,
+                           InputMediaPhoto,
+                           FSInputFile,
+                           InlineKeyboardButton)
 from sqlalchemy import select
 
-from app.database.models.users import User, async_session_maker
-from app.database.requests.crud import add_or_update_user, update_user_city, get_all_profiles, get_user_info, get_user_city, is_profile_info
+from app.database.models.users import (User,
+                                       async_session_maker)
+from app.database.requests.crud import (add_or_update_user,
+                                        update_user_city,
+                                        get_all_profiles,
+                                        get_user_info,
+                                        get_user_city,
+                                        is_profile_info,
+                                        get_count_profiles)
 from app.handlers.admin.admin_start import admin_start_menu
-from app.templates.keyboards.keyboard_buttons import prev_next_button, reviews_button, reviews_button_delete
-from app.templates.keyboards.inline_buttons import gender_start, city_choose, women_subscribe, politic_buttons, other_city, read_faq_inline
+from app.templates.keyboards.keyboard_buttons import (prev_next_button,
+                                                      reviews_button,
+                                                      reviews_button_delete)
+from app.templates.keyboards.inline_buttons import (gender_start,
+                                                    city_choose,
+                                                    women_subscribe,
+                                                    politic_buttons,
+                                                    other_city,
+                                                    read_faq_inline)
 from app.templates.texts.user import message_command_start, faq
 from config import ADMINS
 
@@ -29,6 +49,9 @@ class SessionManager:
 
 
 async def confirm_subscribe(message: Message):
+    """
+    Функция для принятия или отклонения политики конфиденциальности.
+    """
     try:
         await message.answer(
             "Соглашаюсь с "
@@ -45,6 +68,9 @@ async def confirm_subscribe(message: Message):
 
 @start_router.message(CommandStart())
 async def start(message: Message):
+    """
+    Базовая функция Старта бота. Определяет админ ли пользователь.
+    """
     user_id = message.from_user.id
     try:
         if user_id in ADMINS:
@@ -57,6 +83,11 @@ async def start(message: Message):
 
 @start_router.callback_query(F.data == "user_agree")
 async def user_agree(callback_query: CallbackQuery):
+    """
+    Функция, которая перенаправляет пользователей на свое меню.
+    Для новых мужчин и женщин отправляет на выбор города.
+    Если аккаунт уже есть, то мужчинам показывает анкеты, а женщин оставляет в их меню.
+    """
     user_id = callback_query.from_user.id
     try:
         await callback_query.message.delete()
@@ -66,6 +97,7 @@ async def user_agree(callback_query: CallbackQuery):
     try:
         async with SessionManager() as db:
             is_user = await get_user_info(db=db, user_id=user_id)
+        async with SessionManager() as db:
             city = await get_user_city(db=db, user_id=user_id)
     except Exception as e:
         print(f"Ошибка при получении информации о пользователе: {e}")
@@ -87,21 +119,18 @@ async def user_agree(callback_query: CallbackQuery):
             if not profiles:
                 inline_other_city = InlineKeyboardMarkup(inline_keyboard=other_city)
                 try:
-                    await callback_query.message.answer("Анкет в вашем городе ещё нет", reply_markup=inline_other_city)
+                    await callback_query.message.answer("Анкет в вашем "
+                                                        "городе ещё нет",
+                                                        reply_markup=inline_other_city)
                 except Exception as e:
                     print(f"Ошибка при отправке сообщения о нехватке анкет: {e}")
                 return
 
             random_profile = random.choice(profiles)
 
-            service_info = []
-            if random_profile.apartments:
-                service_info.append("Принимаю в апартаментах")
-            if random_profile.outcall:
-                service_info.append("Работаю на выезд")
-            service_text = " и ".join(service_info).capitalize()
-
-            photos_paths = [f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/home/backup/photos/{random_profile.user_id}_{i}.jpg"
+                            for i in range(1, 4)
+                            if os.path.exists(f"/home/backup/photos/{random_profile.user_id}_{i}.jpg")]
             if photos_paths:
                 media = [
                     InputMediaPhoto(
@@ -112,8 +141,8 @@ async def user_agree(callback_query: CallbackQuery):
                             f"<b>Вес:</b> {random_profile.weight}\n"
                             f"<b>Рост:</b> {random_profile.height}\n"
                             f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
-                            f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>"
-                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                            f"<b>Номер телефона:</b> {random_profile.phone_number}"
+                        ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
                 ]
@@ -121,7 +150,9 @@ async def user_agree(callback_query: CallbackQuery):
                 try:
                     await callback_query.message.answer_media_group(media)
                     await callback_query.message.answer(
-                        text="Подсказка! Вы можете использовать стрелки на клавиатуре для переключения между анкетами.",
+                        text="Подсказка! Вы можете использовать "
+                             "стрелки на клавиатуре для "
+                             "переключения между анкетами.",
                         reply_markup=keyboard
                     )
                 except Exception as e:
@@ -135,7 +166,7 @@ async def user_agree(callback_query: CallbackQuery):
                              f"<b>Вес:</b> {random_profile.weight}\n"
                              f"<b>Рост:</b> {random_profile.height}\n"
                              f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
-                             f"\n\n<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
+                             f"\n\n<b>Номер телефона:</b> {random_profile.phone_number}",
                         reply_markup=keyboard
                     )
                 except Exception as e:
@@ -151,21 +182,28 @@ async def user_agree(callback_query: CallbackQuery):
 
             try:
                 if is_profile:
-                    women_key_del = ReplyKeyboardMarkup(keyboard=reviews_button_delete, resize_keyboard=True,
+                    women_key_del = ReplyKeyboardMarkup(keyboard=reviews_button_delete,
+                                                        resize_keyboard=True,
                                                         one_time_keyboard=False)
-                    await callback_query.message.answer(text=message_command_start, reply_markup=women_key_del)
+                    await callback_query.message.answer(text=message_command_start,
+                                                        reply_markup=women_key_del)
                 else:
-                    women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
-                    await callback_query.message.answer(text=message_command_start, reply_markup=women_review)
+                    women_review = ReplyKeyboardMarkup(keyboard=reviews_button,
+                                                       resize_keyboard=True,
+                                                       one_time_keyboard=False)
+                    await callback_query.message.answer(text=message_command_start,
+                                                        reply_markup=women_review)
             except Exception as e:
                 print(f"Ошибка при отправке сообщения для женщин: {e}")
 
         if not is_user:
             inline_politics = InlineKeyboardMarkup(inline_keyboard=politic_buttons)
             try:
-                await callback_query.message.answer(text=message_command_start, reply_markup=inline_politics)
+                await callback_query.message.answer(text=message_command_start,
+                                                    reply_markup=inline_politics)
                 inline_gender = InlineKeyboardMarkup(inline_keyboard=gender_start)
-                await callback_query.message.answer(text="Выберите ваш пол:", reply_markup=inline_gender)
+                await callback_query.message.answer(text="Выберите ваш пол:",
+                                                    reply_markup=inline_gender)
             except Exception as e:
                 print(f"Ошибка при отправке сообщений для нового пользователя: {e}")
     except Exception as e:
@@ -174,8 +212,12 @@ async def user_agree(callback_query: CallbackQuery):
 
 @start_router.callback_query(F.data == "user_disagree")
 async def user_disagree(callback_query: CallbackQuery):
+    """
+    При отказе от политики конфиденциальности пользователя не пропускает дальше.
+    """
     try:
-        await callback_query.message.answer("Вы не можете пользоваться ботом без согласия на обработку данных.")
+        await callback_query.message.answer("Вы не можете пользоваться "
+                                            "ботом без согласия на обработку данных.")
         await confirm_subscribe(callback_query.message)
     except Exception as e:
         print(f"Ошибка при отказе пользователя: {e}")
@@ -191,6 +233,9 @@ async def text_faq_instr(callback_query: CallbackQuery):
 
 @start_router.callback_query(F.data.in_({"man_gender", "woman_gender"}))
 async def process_gender_selection(callback_query: CallbackQuery):
+    """
+    Запись пола в базу данных и перенаправление на выбор города
+    """
     try:
         await callback_query.message.delete()
     except Exception as e:
@@ -201,19 +246,26 @@ async def process_gender_selection(callback_query: CallbackQuery):
 
     try:
         async with SessionManager() as db:
-            await add_or_update_user(user_id=user_id, gender=gender, db=db)
+            await add_or_update_user(user_id=user_id,
+                                     gender=gender,
+                                     db=db)
     except Exception as e:
         print(f"Ошибка при добавлении или обновлении пользователя: {e}")
 
     city_inline = InlineKeyboardMarkup(inline_keyboard=city_choose)
     try:
-        await callback_query.message.answer(text="Выберите свой город:", reply_markup=city_inline)
+        await callback_query.message.answer(text="Выберите свой город:",
+                                            reply_markup=city_inline)
     except Exception as e:
         print(f"Ошибка при отправке сообщения выбора города: {e}")
 
 
 @start_router.callback_query(F.data.startswith('city_'))
 async def process_city_selection(callback_query: CallbackQuery):
+    """
+    После выбора города мужчин отправляет на анкеты женщин в его городе.
+    Девушек направляет на их основное меню в клавиатуре reviews_button.
+    """
     user_id = callback_query.from_user.id
     city_data = callback_query.data
     city = city_data.split('_', 1)[1]
@@ -233,10 +285,13 @@ async def process_city_selection(callback_query: CallbackQuery):
             await callback_query.message.delete()
             women_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
             name = callback_query.from_user.first_name
-            women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
+            women_review = ReplyKeyboardMarkup(keyboard=reviews_button,
+                                               resize_keyboard=True,
+                                               one_time_keyboard=False)
 
             try:
-                await callback_query.message.answer(text=f"Привет, {name}", reply_markup=women_review)
+                await callback_query.message.answer(text=f"Привет, {name}",
+                                                    reply_markup=women_review)
                 await callback_query.message.answer(
                     text="Выберите тип подписки (автоматически продлевается каждый месяц):",
                     reply_markup=women_inline
@@ -260,21 +315,20 @@ async def process_city_selection(callback_query: CallbackQuery):
             if not profiles:
                 inline_other_city = InlineKeyboardMarkup(inline_keyboard=other_city)
                 try:
-                    await callback_query.message.answer("Анкет в вашем городе ещё нет", reply_markup=inline_other_city)
+                    await callback_query.message.answer("Анкет в вашем городе ещё нет",
+                                                        reply_markup=inline_other_city)
                 except Exception as e:
                     print(f"Ошибка при отправке сообщения о нехватке анкет: {e}")
                 return
 
             random_profile = random.choice(profiles)
 
-            service_info = []
-            if random_profile.apartments:
-                service_info.append("Принимаю в апартаментах")
-            if random_profile.outcall:
-                service_info.append("Работаю на выезд")
-            service_text = " и ".join(service_info).capitalize()
+            async with SessionManager() as db:
+                count_profile = await get_count_profiles(db=db, city=city)
 
-            photos_paths = [f"/Users/venya/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg" for i in range(1, 4) if os.path.exists(f"/home/women-bot/app/database/photos/{random_profile.user_id}_{i}.jpg")]
+            photos_paths = [f"/home/backup/photos/{random_profile.user_id}_{i}.jpg"
+                            for i in range(1, 4)
+                            if os.path.exists(f"/home/backup/photos/{random_profile.user_id}_{i}.jpg")]
             if photos_paths:
                 media = [
                     InputMediaPhoto(
@@ -285,7 +339,7 @@ async def process_city_selection(callback_query: CallbackQuery):
                             f"<b>Вес:</b> {random_profile.weight}\n"
                             f"<b>Рост:</b> {random_profile.height}\n"
                             f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
-                            f"<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>"
+                            f"<b>Номер телефона:</b> {random_profile.phone_number}"
                         ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
@@ -300,15 +354,19 @@ async def process_city_selection(callback_query: CallbackQuery):
                     print(f"Ошибка при отправке медиагруппы или сообщения: {e}")
             else:
                 try:
+                    await callback_query.message.answer(text=f"В вашем "
+                                                             f"городе {count_profile} анкет!")
                     await callback_query.message.answer(
                         text=f"<b>Имя:</b> {random_profile.name}\n"
                              f"<b>Возраст:</b> {random_profile.age}\n"
                              f"<b>Вес:</b> {random_profile.weight}\n"
                              f"<b>Рост:</b> {random_profile.height}\n"
                              f"<b>Размер груди:</b> {random_profile.breast_size}\n\n"
-                             f"\n\n<b>Номер телефона:</b> <tg-spoiler>{random_profile.phone_number}</tg-spoiler>",
+                             f"\n\n<b>Номер телефона:</b> {random_profile.phone_number}",
                         reply_markup=keyboard_mens
                     )
+                    await callback_query.message.answer(text="Подсказка! Вы можете использовать стрелки "
+                                                             "на клавиатуре для переключения между анкетами.")
                 except Exception as e:
                     print(f"Ошибка при отправке сообщения о профиле: {e}")
 

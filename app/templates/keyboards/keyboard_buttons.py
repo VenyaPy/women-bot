@@ -58,6 +58,9 @@ admin_menu_keyboard = [
     ],
     [
         KeyboardButton(text="Отключить подписку")
+    ],
+    [
+        KeyboardButton(text="Статистика")
     ]
 ]
 

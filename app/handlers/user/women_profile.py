@@ -2,17 +2,29 @@ import os
 import re
 import sys
 
-from aiogram import Router, F, Bot
+from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, Message, CallbackQuery, InputMediaPhoto, FSInputFile, \
-    ReplyKeyboardMarkup, InputFile, InlineKeyboardButton
+from aiogram.types import (InlineKeyboardMarkup,
+                           Message,
+                           CallbackQuery,
+                           InputMediaPhoto,
+                           FSInputFile,
+                           ReplyKeyboardMarkup,
+                           InlineKeyboardButton)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy.exc import SQLAlchemyError
 from app.database.models.users import async_session_maker
-from app.database.requests.crud import get_user_info, get_user_city, create_profile, is_profile_info, delete_profile
-from app.templates.keyboards.inline_buttons import women_subscribe, enough_photo_women, girl_profile_choose
-from app.templates.keyboards.keyboard_buttons import reviews_button_delete, reviews_button
+from app.database.requests.crud import (get_user_info,
+                                        get_user_city,
+                                        create_profile,
+                                        is_profile_info,
+                                        delete_profile)
+from app.templates.keyboards.inline_buttons import (women_subscribe,
+                                                    enough_photo_women,
+                                                    girl_profile_choose)
+from app.templates.keyboards.keyboard_buttons import (reviews_button_delete,
+                                                      reviews_button)
 
 women_profile_router = Router()
 
@@ -33,20 +45,15 @@ class ProfileDeletion(StatesGroup):
     confirm = State()
 
 
-# Функция для отображения анкеты
 async def show_profile(message: Message, profile):
+    """
+    Функция отображения анкеты при нажатии на кнопку удалить анкету.
+    """
     try:
-        service_info = []
-        if profile.apartments:
-            service_info.append("Принимаю в апартаментах")
-        if profile.outcall:
-            service_info.append("Работаю на выезд")
-        service_text = " и ".join(service_info).capitalize()
-
         photos_paths = [
-            f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg"
+            f"/home/backup/photos/{profile.user_id}_{i}.jpg"
             for i in range(1, 4)
-            if os.path.exists(f"/home/women-bot/app/database/photos/{profile.user_id}_{i}.jpg")
+            if os.path.exists(f"/home/backup/photos/{profile.user_id}_{i}.jpg")
         ]
         if photos_paths:
             media = [
@@ -57,8 +64,8 @@ async def show_profile(message: Message, profile):
                         f"<b>Возраст:</b> {profile.age}\n"
                         f"<b>Вес:</b> {profile.weight}\n"
                         f"<b>Рост:</b> {profile.height}\n"
-                        f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
-                    ) if idx == 0 else None  # Подпись только для первой фотографии
+                        f"<b>Номер телефона:</b> {profile.phone_number}"
+                    ) if idx == 0 else None
                 )
                 for idx, photo_path in enumerate(photos_paths)
             ]
@@ -71,7 +78,7 @@ async def show_profile(message: Message, profile):
                     f"<b>Вес:</b> {profile.weight}\n"
                     f"<b>Рост:</b> {profile.height}\n"
                     f"<b>Размер груди:</b> {profile.breast_size}\n\n"
-                    f"<b>Номер телефона:</b> <tg-spoiler>{profile.phone_number}</tg-spoiler>"
+                    f"<b>Номер телефона:</b> {profile.phone_number}"
                 )
             )
     except Exception as e:
@@ -80,21 +87,28 @@ async def show_profile(message: Message, profile):
 
 @women_profile_router.message(F.text == "Удалить анкету")
 async def delete_my_profile_from_bd(message: Message, state: FSMContext):
+    """
+    Функция удаления существующей анкеты.
+    """
     user_id = message.from_user.id
 
     try:
         async with SessionManager() as db:
-            profile = await is_profile_info(db=db, user_id=user_id)  # Получить анкету пользователя
+            profile = await is_profile_info(db=db,
+                                            user_id=user_id)
 
         if profile:
             await show_profile(message, profile)  # Показать анкету
 
             # Запросить подтверждение удаления
             confirm_markup = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="Да, удалить", callback_data="confirm_delete_profile")],
-                [InlineKeyboardButton(text="Нет, отменить", callback_data="cancel_delete_profile")]
+                [InlineKeyboardButton(text="Да, удалить",
+                                      callback_data="confirm_delete_profile")],
+                [InlineKeyboardButton(text="Нет, отменить",
+                                      callback_data="cancel_delete_profile")]
             ])
-            await message.answer("Вы уверены, что хотите удалить анкету?", reply_markup=confirm_markup)
+            await message.answer("Вы уверены, что хотите удалить анкету?",
+                                 reply_markup=confirm_markup)
 
             await state.set_state(ProfileDeletion.confirm)
         else:
@@ -105,13 +119,16 @@ async def delete_my_profile_from_bd(message: Message, state: FSMContext):
 
 @women_profile_router.callback_query(F.data == "confirm_delete_profile")
 async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Подтверждение удаления анкеты и удаление фотографий с папки.
+    """
     user_id = callback_query.from_user.id
 
     try:
         async with SessionManager() as db:
             await delete_profile(db=db, user_id=user_id)
 
-        base_path = f"/home/women-bot/app/database/photos/{user_id}"
+        base_path = f"/home/backup/photos/{user_id}"
 
         index = 1
         while True:
@@ -125,9 +142,12 @@ async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContex
         await state.clear()
         await callback_query.message.answer(text="Данные об анкете удалены!")
 
-        women_review = ReplyKeyboardMarkup(keyboard=reviews_button, resize_keyboard=True, one_time_keyboard=False)
+        women_review = ReplyKeyboardMarkup(keyboard=reviews_button,
+                                           resize_keyboard=True,
+                                           one_time_keyboard=False)
 
-        await callback_query.message.answer("Ваша анкета удалена! Теперь вы можете добавить новую.",
+        await callback_query.message.answer("Ваша анкета удалена! "
+                                            "Теперь вы можете добавить новую.",
                                             reply_markup=women_review)
         await state.clear()
     except Exception as e:
@@ -136,6 +156,9 @@ async def confirm_delete_profile(callback_query: CallbackQuery, state: FSMContex
 
 @women_profile_router.callback_query(F.data == "cancel_delete_profile")
 async def cancel_delete_profile(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Отмена удаления анкеты.
+    """
     try:
         await callback_query.message.answer("Удаление анкеты отменено.")
         await state.clear()
@@ -157,6 +180,9 @@ class WomenProfile(StatesGroup):
 
 @women_profile_router.message(F.text == "Добавить анкету")
 async def add_women_profile(message: Message, state: FSMContext):
+    """
+    Функция добавление анкеты при оплаченной подписке.
+    """
     user_id = message.from_user.id
     try:
         inline_girl_del = InlineKeyboardMarkup(inline_keyboard=girl_profile_choose)
@@ -168,21 +194,18 @@ async def add_women_profile(message: Message, state: FSMContext):
         sub_inline = InlineKeyboardMarkup(inline_keyboard=women_subscribe)
 
         if info.subscription_type not in ["Анкета", "Проверка + Анкета"]:
-            await message.answer(text="Чтобы воспользоваться этой функцией необходимо оформить подписку (автоматически продлевается каждый месяц):", reply_markup=sub_inline)
+            await message.answer(text="Чтобы воспользоваться этой функцией "
+                                      "необходимо оформить подписку (автоматически "
+                                      "продлевается каждый месяц):",
+                                 reply_markup=sub_inline)
             return
 
         if is_profile:
-            service_info = []
-            if is_profile.apartments:
-                service_info.append("Принимаю в апартаментах")
-            if is_profile.outcall:
-                service_info.append("Работаю на выезд")
-            service_text = " и ".join(service_info).capitalize()
 
             photos_paths = [
-                f"/home/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg"
+                f"/home/backup/photos/{is_profile.user_id}_{i}.jpg"
                 for i in range(1, 4)
-                if os.path.exists(f"/home/women-bot/app/database/photos/{is_profile.user_id}_{i}.jpg")
+                if os.path.exists(f"/home/backup/photos/{is_profile.user_id}_{i}.jpg")
             ]
             if photos_paths:
                 media = [
@@ -194,14 +217,15 @@ async def add_women_profile(message: Message, state: FSMContext):
                             f"<b>Вес:</b> {is_profile.weight}\n"
                             f"<b>Рост:</b> {is_profile.height}\n"
                             f"<b>Размер груди:</b> {is_profile.breast_size}\n\n"
-                            f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
+                            f"<b>Номер телефона:</b> {is_profile.phone_number}"
                         ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
                 ]
                 if media:
                     await message.answer_media_group(media=media)
-                    await message.answer(text="Действия с анкетой:", reply_markup=inline_girl_del)
+                    await message.answer(text="Действия с анкетой:",
+                                         reply_markup=inline_girl_del)
             else:
                 await message.answer(
                     text=(
@@ -210,7 +234,7 @@ async def add_women_profile(message: Message, state: FSMContext):
                         f"<b>Вес:</b> {is_profile.weight}\n"
                         f"<b>Рост:</b> {is_profile.height}\n"
                         f"<b>Размер груди:</b> {is_profile.breast_size}\n\n"
-                        f"<b>Номер телефона:</b> <tg-spoiler>{is_profile.phone_number}</tg-spoiler>"
+                        f"<b>Номер телефона:</b> {is_profile.phone_number}"
                     ),
                     reply_markup=inline_girl_del,
                 )
@@ -223,6 +247,9 @@ async def add_women_profile(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.name)
 async def process_name(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение имени
+    """
     try:
         await state.update_data(name=message.text)
         await message.answer("Введите ваш возраст, например: 25")
@@ -233,6 +260,9 @@ async def process_name(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.age)
 async def process_age(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение возраста
+    """
     try:
         if message.text.isdigit():
             await state.update_data(age=int(message.text))
@@ -246,6 +276,9 @@ async def process_age(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.weight)
 async def process_weight(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение веса
+    """
     try:
         if message.text.isdigit():
             await state.update_data(weight=int(message.text))
@@ -259,6 +292,9 @@ async def process_weight(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.height)
 async def process_height(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение роста
+    """
     try:
         if message.text.isdigit():
             await state.update_data(height=int(message.text))
@@ -272,6 +308,9 @@ async def process_height(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.breast_size)
 async def process_breast_size(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение номера телефона
+    """
     try:
         if message.text.isdigit():
             await state.update_data(breast_size=int(message.text))
@@ -283,8 +322,10 @@ async def process_breast_size(message: Message, state: FSMContext):
         print(e)
 
 
-
 def format_phone_number(phone_number: str) -> str:
+    """
+    Форматирование номера телефона в нужный формат 8 *** *** ** **
+    """
     try:
         digits = re.sub(r'\D', '', phone_number)
 
@@ -304,6 +345,9 @@ def format_phone_number(phone_number: str) -> str:
 
 @women_profile_router.message(WomenProfile.phone_number)
 async def process_phone_number(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение 1 фото
+    """
     try:
         formatted_number = format_phone_number(message.text)
         if "Ошибка" in formatted_number:
@@ -318,6 +362,9 @@ async def process_phone_number(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.photo1, F.photo)
 async def process_photo1(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение 2 фото
+    """
     try:
         user_data = await state.get_data()
         photos_list = user_data.get("photos", [])
@@ -325,13 +372,15 @@ async def process_photo1(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
-        await message.bot.download(file=photo_file_id, destination=file_path)
+        file_path = f"/home/backup/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        await message.bot.download(file=photo_file_id,
+                                   destination=file_path)
         photos_list.append(file_path)
 
         await state.update_data(photos=photos_list)
 
-        await message.answer("Загрузите еще одно фото или подтвердите анкету.", reply_markup=inline_done_photo)
+        await message.answer("Загрузите еще одно фото или подтвердите анкету.",
+                             reply_markup=inline_done_photo)
         await state.set_state(WomenProfile.photo2)
     except Exception as e:
         print(f"Error in process_photo1: {e}")
@@ -339,6 +388,9 @@ async def process_photo1(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.photo2, F.photo)
 async def process_photo2(message: Message, state: FSMContext):
+    """
+    Ожидание и сохранение 3 фото
+    """
     try:
         user_data = await state.get_data()
         photos_list = user_data.get("photos", [])
@@ -346,13 +398,15 @@ async def process_photo2(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
-        await message.bot.download(file=photo_file_id, destination=file_path)
+        file_path = f"/home/backup/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        await message.bot.download(file=photo_file_id,
+                                   destination=file_path)
         photos_list.append(file_path)
 
         await state.update_data(photos=photos_list)
 
-        await message.answer("Загрузите еще одно фото или подтвердите анкету.", reply_markup=inline_done_photo)
+        await message.answer("Загрузите еще одно фото или подтвердите анкету.",
+                             reply_markup=inline_done_photo)
         await state.set_state(WomenProfile.photo3)
     except Exception as e:
         print(f"Error in process_photo2: {e}")
@@ -360,6 +414,9 @@ async def process_photo2(message: Message, state: FSMContext):
 
 @women_profile_router.message(WomenProfile.photo3, F.photo)
 async def process_photo3(message: Message, state: FSMContext):
+    """
+    Ожидание подтверждения анкеты
+    """
     try:
         user_data = await state.get_data()
         photos_list = user_data.get("photos", [])
@@ -367,13 +424,15 @@ async def process_photo3(message: Message, state: FSMContext):
 
         largest_photo = message.photo[-1]
         photo_file_id = largest_photo.file_id
-        file_path = f"/home/women-bot/app/database/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
-        await message.bot.download(file=photo_file_id, destination=file_path)
+        file_path = f"/home/backup/photos/{message.from_user.id}_{len(photos_list) + 1}.jpg"
+        await message.bot.download(file=photo_file_id,
+                                   destination=file_path)
         photos_list.append(file_path)
 
         await state.update_data(photos=photos_list)
 
-        await message.answer("Подтвердите анкету.", reply_markup=inline_done_photo)
+        await message.answer("Подтвердите анкету.",
+                             reply_markup=inline_done_photo)
     except Exception as e:
         print(f"Error in process_photo3: {e}")
 
@@ -386,6 +445,9 @@ async def shutdown_bot(message: Message):
 
 @women_profile_router.callback_query(F.data == "enough_photos")
 async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Сохранение данный об анкете в базу данных
+    """
     data = await state.get_data()
     user_id = callback_query.from_user.id
     try:
@@ -400,7 +462,7 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                 age=int(data.get("age", 0)),
                 weight=int(data.get("weight", 0)),
                 height=int(data.get("height", 0)),
-                breast_size=str(data.get("breast_size", 0)),  # Изменение здесь
+                breast_size=str(data.get("breast_size", 0)),
                 phone_number=data.get("phone_number", ""),
                 apartments=data.get("apartments", "").lower() == "да",
                 outcall=data.get("outcall", "").lower() == "да",
@@ -410,18 +472,12 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
 
             await callback_query.message.answer("Ваша анкета успешно создана")
 
-            service_info = []
-            if data.get("apartments", "").lower() == "да":
-                service_info.append("Принимаю в апартаментах")
-            if data.get("outcall", "").lower() == "да":
-                service_info.append("Работаю на выезд")
-            service_text = " и ".join(service_info).capitalize()
-
             photos_paths = [
-                f"/home/women-bot/app/database/photos/{user_id}_{i}.jpg"
+                f"/home/backup/photos/{user_id}_{i}.jpg"
                 for i in range(1, 4)
-                if os.path.exists(f"/home/women-bot/app/database/photos/{user_id}_{i}.jpg")
+                if os.path.exists(f"/home/backup/photos/{user_id}_{i}.jpg")
             ]
+
             if photos_paths:
                 media = [
                     InputMediaPhoto(
@@ -430,10 +486,9 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
                             f"<b>Имя:</b> {data.get('name')}\n"
                             f"<b>Возраст:</b> {data.get('age')}\n"
                             f"<b>Вес:</b> {data.get('weight')}\n"
-                            f"<b>Рост:</b> {data.get('height')}\n"
-                            f"<b>Размер груди:</b> {data.get('breast_size')}\n\n"  # Изменение здесь
-                            f"<b>Номер телефона:</b> <tg-spoiler>{data.get('phone_number')}</tg-spoiler>"
-                        ) if idx == 0 else None  # Подпись только для первой фотографии
+                            f"<b>Рост:</b> {data.get('height')}\n\n"
+                            f"<b>Номер телефона:</b> {data.get('phone_number')}"
+                        ) if idx == 0 else None
                     )
                     for idx, photo_path in enumerate(photos_paths)
                 ]
@@ -446,16 +501,20 @@ async def send_women_profile_to_bd(callback_query: CallbackQuery, state: FSMCont
             await callback_query.answer()
             await state.clear()
     except SQLAlchemyError as db_err:
-        print(f"Database error in send_women_profile_to_bd for user_id {user_id}: {db_err}")
+        print(f"Database error in send_women_profile_to_bd"
+              f" for user_id {user_id}: {db_err}")
     except Exception as e:
         print(f"Error in send_women_profile_to_bd for user_id {user_id}: {e}")
 
 
 @women_profile_router.callback_query(F.data == "cancel_send_profile")
 async def cancel_send_profile(callback_query: CallbackQuery, state: FSMContext):
+    """
+    Отмена сохранение анкеты и удаление фотографий
+    """
     user_id = callback_query.from_user.id
     try:
-        base_path = f"/home/women-bot/app/database/photos/{user_id}"
+        base_path = f"/home/backup/photos/{user_id}"
 
         index = 1
         while True:
